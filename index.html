@@ -22,7 +22,7 @@
       border-radius: 20px; 
       box-shadow: 0 10px 25px rgba(0,0,0,0.08); 
       width: 100%; 
-      max-width: 420px; 
+      max-width: 460px; 
       text-align: center; 
     }
     h2 { color: #1e293b; margin: 0 0 8px 0; font-size: 22px; }
@@ -32,10 +32,9 @@
       border-radius: 12px; 
       font-weight: 600; 
       font-size: 15px;
-      margin-bottom: 24px; 
+      margin-bottom: 16px; 
       background: #f1f5f9; 
       color: #475569; 
-      transition: all 0.3s ease;
     }
     .status-box.active { background: #dcfce7; color: #15803d; }
     .status-box.error { background: #fee2e2; color: #b91c1c; }
@@ -48,106 +47,129 @@
       font-size: 16px; 
       font-weight: 600;
       cursor: pointer; 
-      transition: background 0.2s; 
       width: 100%; 
     }
-    .btn:hover { background: #1d4ed8; }
     .btn:disabled { background: #cbd5e1; cursor: not-allowed; }
     .btn-stop { background: #ef4444; }
-    .btn-stop:hover { background: #dc2626; }
+    
+    /* กล่องแสดง Debug Log */
+    .log-box {
+      margin-top: 20px;
+      padding: 12px;
+      background: #0f172a;
+      color: #38bdf8;
+      font-family: monospace;
+      font-size: 12px;
+      text-align: left;
+      border-radius: 8px;
+      max-height: 180px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
   </style>
 </head>
 <body>
 
 <div class="card">
   <h2>Gemini Live Audio PoC</h2>
-  <p>ระบบทดสอบเสียงโต้ตอบเรียลไทม์<br>(Gemini Multimodal Live API)</p>
+  <p>ระบบทดสอบเสียงโต้ตอบเรียลไทม์ (Debug Mode)</p>
   
   <div id="status" class="status-box">สถานะ: พร้อมเชื่อมต่อ</div>
 
   <button id="startBtn" class="btn">เริ่มการสนทนา (Start Call)</button>
   <button id="stopBtn" class="btn btn-stop" style="display: none;">จบการสนทนา (End Call)</button>
+
+  <div id="log" class="log-box">-- บันทึกการทำงานระบบ (Debug Log) --\n</div>
 </div>
 
 <script>
   const startBtn = document.getElementById('startBtn');
   const stopBtn = document.getElementById('stopBtn');
   const statusDiv = document.getElementById('status');
+  const logDiv = document.getElementById('log');
 
   let ws = null;
   let audioCtx = null;
   let nextStartTime = 0;
+
+  function log(msg) {
+    console.log(msg);
+    logDiv.innerText += `\n[${new Date().toLocaleTimeString()}] ${msg}`;
+    logDiv.scrollTop = logDiv.scrollHeight;
+  }
 
   function updateStatus(text, type = '') {
     statusDiv.innerText = `สถานะ: ${text}`;
     statusDiv.className = `status-box ${type}`;
   }
 
-  // แปลง Raw Base64 PCM เป็น AudioBuffer และสั่งเล่นเสียงสตรีมมิ่ง
   async function playAudioChunk(base64Pcm) {
     if (!audioCtx) return;
+    try {
+      const binaryString = atob(base64Pcm);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const int16Array = new Int16Array(bytes.buffer);
+      const float32Array = new Float32Array(int16Array.length);
+      for (let i = 0; i < int16Array.length; i++) {
+        float32Array[i] = int16Array[i] / 32768.0;
+      }
 
-    const binaryString = atob(base64Pcm);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
+      const audioBuffer = audioCtx.createBuffer(1, float32Array.length, 24000);
+      audioBuffer.getChannelData(0).set(float32Array);
+
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioCtx.destination);
+
+      const currentTime = audioCtx.currentTime;
+      if (nextStartTime < currentTime) nextStartTime = currentTime;
+
+      source.start(nextStartTime);
+      nextStartTime += audioBuffer.duration;
+    } catch (e) {
+      log("Error playing audio chunk: " + e.message);
     }
-
-    const int16Array = new Int16Array(bytes.buffer);
-    const float32Array = new Float32Array(int16Array.length);
-    for (let i = 0; i < int16Array.length; i++) {
-      float32Array[i] = int16Array[i] / 32768.0;
-    }
-
-    // Gemini Live API ส่งสัญญาณเสียง PCM 24000Hz Mono
-    const audioBuffer = audioCtx.createBuffer(1, float32Array.length, 24000);
-    audioBuffer.getChannelData(0).set(float32Array);
-
-    const source = audioCtx.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(audioCtx.destination);
-
-    const currentTime = audioCtx.currentTime;
-    if (nextStartTime < currentTime) {
-      nextStartTime = currentTime;
-    }
-
-    source.start(nextStartTime);
-    nextStartTime += audioBuffer.duration;
   }
 
   async function startSession() {
+    log("กำลังเริ่มกระบวนการ...");
     updateStatus("กำลังดึงข้อมูลการเชื่อมต่อ...", "");
     startBtn.disabled = true;
 
     try {
-      // 1. ดึง API Key จาก Vercel Serverless Function
+      log("ส่ง Request ไปที่ /api/live เพื่อขอ Key...");
       const response = await fetch('/api/live');
       const data = await response.json();
 
       if (!data.key) {
-        updateStatus("ไม่พบ GEMINI_API_KEY ใน Vercel Environment", "error");
+        log("ERROR: ไม่ได้รับ API Key จาก Vercel");
+        updateStatus("ไม่พบ GEMINI_API_KEY", "error");
         startBtn.disabled = false;
         return;
       }
+      log("ได้รับ API Key เรียบร้อยแล้ว (ยาว " + data.key.length + " ตัวอักษร)");
 
-      // 2. สร้าง AudioContext และปลุกให้ทำงานสำหรับเบราว์เซอร์แท็บเล็ต
       audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
       if (audioCtx.state === 'suspended') {
         await audioCtx.resume();
+        log("ปลุก AudioContext สำเร็จ");
       }
       nextStartTime = audioCtx.currentTime;
 
-      // 3. เชื่อมต่อ WebSocket ตรงไปยัง Gemini API (ใช้โมเดล gemini-2.0-flash-exp)
       const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${data.key}`;
+      log("กำลังเชื่อมต่อ WebSocket ไปยัง Google API...");
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        updateStatus("เชื่อมต่อสำเร็จ! กำลังส่งข้อมูล...", "active");
+        log("WebSocket Connected!");
+        updateStatus("เชื่อมต่อสำเร็จ! กำลังส่ง Setup...", "active");
         startBtn.style.display = "none";
         stopBtn.style.display = "block";
 
-        // โครงสร้างการส่ง Config ที่ถูกต้องของ Gemini Live API
         const setupConfig = {
           setup: {
             model: "models/gemini-2.0-flash-exp",
@@ -164,10 +186,11 @@
             }
           }
         };
+        log("ส่ง Setup Config...");
         ws.send(JSON.stringify(setupConfig));
 
-        // ส่งข้อความกระตุ้นให้ AI เริ่มพูดประโยคแรก
         setTimeout(() => {
+          log("ส่ง Prompt แรกให้ AI พูด...");
           const clientContent = {
             clientContent: {
               turns: [{ role: "user", parts: [{ text: "สวัสดีครับ มีอะไรให้ช่วยไหมครับ" }] }],
@@ -179,28 +202,30 @@
       };
 
       ws.onmessage = async (event) => {
+        log("ได้รับ Message จาก Google!");
         try {
           let resData = JSON.parse(event.data);
           if (resData.serverContent && resData.serverContent.modelTurn) {
             const parts = resData.serverContent.modelTurn.parts;
             for (const part of parts) {
               if (part.inlineData && part.inlineData.mimeType && part.inlineData.mimeType.startsWith("audio/pcm")) {
+                log("กำลังประมวลผลสตรีมเสียง PCM...");
                 await playAudioChunk(part.inlineData.data);
               }
             }
           }
         } catch (err) {
-          console.error("Error parsing WS message:", err);
+          log("Parse Error: " + err.message);
         }
       };
 
       ws.onerror = (err) => {
-        console.error("WebSocket Error:", err);
+        log("WebSocket ERROR Event เกิดขึ้น!");
         updateStatus("เกิดข้อผิดพลาดในการเชื่อมต่อ", "error");
       };
 
       ws.onclose = (evt) => {
-        console.log("WebSocket Closed Code:", evt.code, "Reason:", evt.reason);
+        log(`WebSocket ปิดการเชื่อมต่อ! (Code: ${evt.code}, Reason: "${evt.reason}")`);
         updateStatus("จบการสนทนาเรียบร้อย", "");
         startBtn.style.display = "block";
         startBtn.disabled = false;
@@ -208,13 +233,14 @@
       };
 
     } catch (err) {
-      console.error("Fetch Error:", err);
+      log("Fetch Error: " + err.message);
       updateStatus("ดึง Key ไม่สำเร็จ", "error");
       startBtn.disabled = false;
     }
   }
 
   function stopSession() {
+    log("กดปุ่มจบการสนทนา");
     if (ws) ws.close();
     if (audioCtx) audioCtx.close();
   }
