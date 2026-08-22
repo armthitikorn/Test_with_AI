@@ -126,10 +126,8 @@
 
     // ชี้การเชื่อมต่อไปยัง WebSocket Proxy บน Vercel (ไม่ต้องแนบ API Key)
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.host}/api/ws-live`;
-    
-    ws = new WebSocket(wsUrl);
-
+const wsUrl = `${wsProtocol}//${window.location.host}/api/live`;
+ws = new WebSocket(wsUrl);
     ws.onopen = () => {
       updateStatus("เชื่อมต่อสำเร็จ! สั่งให้ AI พูดทักทาย...", "active");
       startBtn.style.display = "none";
