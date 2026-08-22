@@ -168,10 +168,9 @@ ws.onopen = () => {
   startBtn.style.display = "none";
   stopBtn.style.display = "block";
 
-  // โครงสร้าง Setup สำหรับ Gemini Multimodal Live
   const setupMessage = {
     setup: {
-      model: "models/gemini-3.6-flash", // แก้ไขเป็นโมเดลรุ่นใหม่ล่าสุดตามที่คุณอาร์มบอก
+      model: "models/gemini-2.5-flash", // ใช้ชื่อนี้เท่านั้นสำหรับ Live API
       generationConfig: {
         responseModalities: ["AUDIO"],
         speechConfig: {
