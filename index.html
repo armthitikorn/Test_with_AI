@@ -52,7 +52,6 @@
     .btn:disabled { background: #cbd5e1; cursor: not-allowed; }
     .btn-stop { background: #ef4444; }
     
-    /* กล่องแสดง Debug Log */
     .log-box {
       margin-top: 20px;
       padding: 12px;
@@ -141,7 +140,6 @@
     startBtn.disabled = true;
 
     try {
-      log("ส่ง Request ไปที่ /api/live เพื่อขอ Key...");
       const response = await fetch('/api/live');
       const data = await response.json();
 
@@ -151,17 +149,17 @@
         startBtn.disabled = false;
         return;
       }
-      log("ได้รับ API Key เรียบร้อยแล้ว (ยาว " + data.key.length + " ตัวอักษร)");
+      log("ได้รับ API Key เรียบร้อยแล้ว");
 
       audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
       if (audioCtx.state === 'suspended') {
         await audioCtx.resume();
-        log("ปลุก AudioContext สำเร็จ");
       }
       nextStartTime = audioCtx.currentTime;
 
+      // บังคับใช้ v1alpha endpoint สำหรับ Bidi Stream
       const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${data.key}`;
-      log("กำลังเชื่อมต่อ WebSocket ไปยัง Google API...");
+      log("กำลังเชื่อมต่อ WebSocket ไปยัง Google API (v1alpha)...");
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
@@ -170,9 +168,10 @@
         startBtn.style.display = "none";
         stopBtn.style.display = "block";
 
-        const setupConfig = {
+        // โครงสร้าง Setup มาตรฐานของ Bidi API
+        const setupMessage = {
           setup: {
-            model: "models/gemini-2.5-flash", // ใช้ Gemini 2.5 Flash ตามที่ API กำหนด
+            model: "models/gemini-2.0-flash-exp",
             generationConfig: {
               responseModalities: ["AUDIO"],
               speechConfig: {
@@ -186,25 +185,29 @@
             }
           }
         };
-        log("ส่ง Setup Config...");
-        ws.send(JSON.stringify(setupConfig));
 
-        setTimeout(() => {
-          log("ส่ง Prompt แรกให้ AI พูด...");
-          const clientContent = {
-            clientContent: {
-              turns: [{ role: "user", parts: [{ text: "สวัสดีครับ มีอะไรให้ช่วยไหมครับ" }] }],
-              turnComplete: true
-            }
-          };
-          ws.send(JSON.stringify(clientContent));
-        }, 500);
+        log("ส่ง Setup Message...");
+        ws.send(JSON.stringify(setupMessage));
       };
 
       ws.onmessage = async (event) => {
-        log("ได้รับ Message จาก Google!");
         try {
           let resData = JSON.parse(event.data);
+
+          // ถ้า Server ตอบรับ Setup เรียบร้อย ให้ส่ง Prompt แรกออกไป
+          if (resData.setupComplete) {
+            log("Setup Complete! กำลังส่ง Prompt แรก...");
+            const clientContent = {
+              clientContent: {
+                turns: [{ role: "user", parts: [{ text: "สวัสดีครับ มีอะไรให้ช่วยไหมครับ" }] }],
+                turnComplete: true
+              }
+            };
+            ws.send(JSON.stringify(clientContent));
+            return;
+          }
+
+          // เมื่อได้รับข้อมูลเสียงตอบกลับจาก Gemini
           if (resData.serverContent && resData.serverContent.modelTurn) {
             const parts = resData.serverContent.modelTurn.parts;
             for (const part of parts) {
