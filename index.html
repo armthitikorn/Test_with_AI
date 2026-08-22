@@ -79,7 +79,7 @@
   <button id="startBtn" class="btn">เริ่มการสนทนา (Start Call)</button>
   <button id="stopBtn" class="btn btn-stop" style="display: none;">จบการสนทนา (End Call)</button>
 
-  <div id="log" class="log-box">-- บันทึกการทำงานระบบ (Debug Log) --\n</div>
+  <div id="log" class="log-box">-- บันทึกการทำงานระบบ (Debug Log) --</div>
 </div>
 
 <script>
@@ -157,50 +157,55 @@
       }
       nextStartTime = audioCtx.currentTime;
 
-      // บังคับใช้ v1alpha endpoint สำหรับ Bidi Stream
+      // Endpoint สำหรับ Bidi Streaming Live API
       const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${data.key}`;
       log("กำลังเชื่อมต่อ WebSocket ไปยัง Google API (v1alpha)...");
       ws = new WebSocket(wsUrl);
 
-ws.onopen = () => {
-  log("WebSocket Connected!");
-  updateStatus("เชื่อมต่อสำเร็จ! กำลังส่ง Setup...", "active");
-  startBtn.style.display = "none";
-  stopBtn.style.display = "block";
+      ws.onopen = () => {
+        log("WebSocket Connected!");
+        updateStatus("เชื่อมต่อสำเร็จ! กำลังส่ง Setup...", "active");
+        startBtn.style.display = "none";
+        stopBtn.style.display = "block";
 
-  const setupMessage = {
-    setup: {
-      model: "models/gemini-2.5-flash", // ใช้ชื่อนี้เท่านั้นสำหรับ Live API
-      generationConfig: {
-        responseModalities: ["AUDIO"],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: "Puck" } // ตัวเลือกเสียง: Puck, Charon, Kore, Fenrir, Aoede
+        const setupMessage = {
+          setup: {
+            model: "models/gemini-2.5-flash",
+            generationConfig: {
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName: "Puck" }
+                }
+              }
+            },
+            systemInstruction: {
+              parts: [{ 
+                text: "คุณคือลูกค้าชื่อ 'น้องฟ้า' ที่กำลังโทรเข้ามาสอบถามประกันภัยรถยนต์ ให้พูดโต้ตอบด้วยน้ำเสียงธรรมชาติมากๆ เหมือนมนุษย์จริง มีจังหวะถอนหายใจ เว้นช่วงคิด พูด 'เอ่อ' หรือ 'อ่า' ได้ตามธรรมชาติ ไม่ต้องพูดจาเป็นทางการเหมือนหุ่นยนต์" 
+              }]
+            }
           }
-        }
-      },
-      systemInstruction: {
-        parts: [{ 
-          text: "คุณคือลูกค้าที่กำลังโทรเข้ามาสอบถามประกันภัยรถยนต์ ให้พูดโต้ตอบด้วยน้ำเสียงธรรมชาติมากๆ เหมือนมนุษย์จริง มีจังหวะถอนหายใจ เว้นช่วงคิด พูด 'เอ่อ' หรือ 'อ่า' ได้ตามธรรมชาติ ไม่ต้องพูดจาเป็นทางการเหมือนหุ่นยนต์" 
-        }]
-      }
-    }
-  };
+        };
 
-  log("ส่ง Setup Message...");
-  ws.send(JSON.stringify(setupMessage));
-};
+        log("ส่ง Setup Message...");
+        ws.send(JSON.stringify(setupMessage));
+      };
 
       ws.onmessage = async (event) => {
         try {
           let resData = JSON.parse(event.data);
 
-          // ถ้า Server ตอบรับ Setup เรียบร้อย ให้ส่ง Prompt แรกออกไป
+          // เมื่อ Server ตอบกลับว่า Setup สำเร็จ
           if (resData.setupComplete) {
-            log("Setup Complete! กำลังส่ง Prompt แรก...");
+            log("Setup Complete! ส่งคำทักทายเปิดสาย...");
+            updateStatus("พร้อมสนทนา (กำลังพูดคุย)", "active");
+            
             const clientContent = {
               clientContent: {
-                turns: [{ role: "user", parts: [{ text: "สวัสดีครับ มีอะไรให้ช่วยไหมครับ" }] }],
+                turns: [{ 
+                  role: "user", 
+                  parts: [{ text: "สวัสดีครับน้องฟ้า มีอะไรให้ช่วยเหลือไหมครับ" }] 
+                }],
                 turnComplete: true
               }
             };
@@ -208,7 +213,7 @@ ws.onopen = () => {
             return;
           }
 
-          // เมื่อได้รับข้อมูลเสียงตอบกลับจาก Gemini
+          // เมื่อได้รับสตรีมเสียงจาก Gemini
           if (resData.serverContent && resData.serverContent.modelTurn) {
             const parts = resData.serverContent.modelTurn.parts;
             for (const part of parts) {
