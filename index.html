@@ -162,33 +162,35 @@
       log("กำลังเชื่อมต่อ WebSocket ไปยัง Google API (v1alpha)...");
       ws = new WebSocket(wsUrl);
 
-      ws.onopen = () => {
-        log("WebSocket Connected!");
-        updateStatus("เชื่อมต่อสำเร็จ! กำลังส่ง Setup...", "active");
-        startBtn.style.display = "none";
-        stopBtn.style.display = "block";
+ws.onopen = () => {
+  log("WebSocket Connected!");
+  updateStatus("เชื่อมต่อสำเร็จ! กำลังส่ง Setup...", "active");
+  startBtn.style.display = "none";
+  stopBtn.style.display = "block";
 
-        // โครงสร้าง Setup มาตรฐานของ Bidi API
-        const setupMessage = {
-          setup: {
-            model: "models/gemini-2.0-flash-exp",
-            generationConfig: {
-              responseModalities: ["AUDIO"],
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: { voiceName: "Puck" }
-                }
-              }
-            },
-            systemInstruction: {
-              parts: [{ text: "คุณคือลูกค้าที่กำลังโทรเข้ามาสอบถามประกันภัยรถยนต์ ให้พูดทักทายด้วยน้ำเสียงเป็นธรรมชาติ" }]
-            }
+  // โครงสร้าง Setup สำหรับ Gemini Multimodal Live
+  const setupMessage = {
+    setup: {
+      model: "models/gemini-3.6-flash", // แก้ไขเป็นโมเดลรุ่นใหม่ล่าสุดตามที่คุณอาร์มบอก
+      generationConfig: {
+        responseModalities: ["AUDIO"],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: "Puck" } // ตัวเลือกเสียง: Puck, Charon, Kore, Fenrir, Aoede
           }
-        };
+        }
+      },
+      systemInstruction: {
+        parts: [{ 
+          text: "คุณคือลูกค้าที่กำลังโทรเข้ามาสอบถามประกันภัยรถยนต์ ให้พูดโต้ตอบด้วยน้ำเสียงธรรมชาติมากๆ เหมือนมนุษย์จริง มีจังหวะถอนหายใจ เว้นช่วงคิด พูด 'เอ่อ' หรือ 'อ่า' ได้ตามธรรมชาติ ไม่ต้องพูดจาเป็นทางการเหมือนหุ่นยนต์" 
+        }]
+      }
+    }
+  };
 
-        log("ส่ง Setup Message...");
-        ws.send(JSON.stringify(setupMessage));
-      };
+  log("ส่ง Setup Message...");
+  ws.send(JSON.stringify(setupMessage));
+};
 
       ws.onmessage = async (event) => {
         try {
