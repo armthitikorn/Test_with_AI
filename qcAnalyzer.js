@@ -24,7 +24,8 @@ async function runQCEvaluation(transcriptData, apiKey) {
     บทสนทนา:
     ${JSON.stringify(transcriptData, null, 2)}`;
 
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+    // 📌 จุดที่แก้ไข: เอา // ... ออก และเปิด-ปิดวงเล็บให้ถูกต้อง
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
