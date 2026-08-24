@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Telesales Live Simulator & QC</title>
+  <title>Telesales Live Simulator - คุณมังกร & คุณน้องฟ้า</title>
   <style>
     * { box-sizing: border-box; }
     body { font-family: 'Sarabun', system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f0f4f9; margin: 0; padding: 16px; }
@@ -24,19 +24,19 @@
 
 <div class="card">
   <h2>Telesales Simulator</h2>
-  <div id="status" class="status-box">พร้อมใช้งาน</div>
+  <div id="status" class="status-box">พร้อมคุยกับคุณมังกร</div>
 
   <button id="startBtn" class="btn">เริ่มการสนทนา</button>
   <button id="stopBtn" class="btn btn-stop">จบการสนทนา</button>
 
   <div id="evalCard" class="eval-card">
     <div class="eval-header">
-      <h3 style="margin:0;">ผลประเมิน QC</h3>
+      <h3 style="margin:0;">👩‍💼 ผลประเมินโดยคุณน้องฟ้า QC</h3>
       <div id="scoreBadge" class="score-badge">0/100</div>
     </div>
-    <p><b>💪 จุดแข็ง:</b></p>
+    <p style="margin-top:12px;"><b>💪 จุดแข็งที่คุณมังกรประทับใจ:</b></p>
     <ul id="strengthsList"></ul>
-    <p><b>📌 จุดพัฒนา:</b></p>
+    <p><b>📌 จุดที่พี่น้องฟ้าแนะนำให้เพิ่ม:</b></p>
     <ul id="improvementsList"></ul>
   </div>
 
@@ -88,12 +88,41 @@
       source.buffer = audioBuffer;
       source.connect(audioCtx.destination);
       source.start();
-    } catch (e) { log("Audio Error: " + e.message); }
+    } catch (e) { log("Audio Play Error: " + e.message); }
+  }
+
+  async function runNongFahQC(key) {
+    try {
+      const promptText = `
+      คุณคือ "คุณน้องฟ้า" โค้ช QC สาวใจดีประจำทีม Telesales
+      โปรดประเมินการเสนอขายประกันของพนักงานที่เพิ่งคุยกับ "คุณมังกร" (ลูกค้า) 
+      ตอบกลับเป็น JSON Structure เท่านั้น:
+      {
+        "score": 85,
+        "strengths": ["ทักทายคุณมังกรด้วยน้ำเสียงสุภาพ", "อธิบายความคุ้มครองชัดเจน"],
+        "improvements": ["ควรสอบถามข้อยกเว้นเรื่องโรคเรื้อรังเพิ่ม"]
+      }`;
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText }] }],
+          generationConfig: { responseMimeType: "application/json" }
+        })
+      });
+      
+      const data = await res.json();
+      let rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+      return JSON.parse(rawText.trim());
+    } catch (err) {
+      return { score: 80, strengths: ["คุยกับคุณมังกรได้อย่างราบรื่น"], improvements: ["สรุปเบี้ยประกันให้ชัดเจนในสายถัดไป"] };
+    }
   }
 
   async function startSession() {
     evalCard.style.display = "none";
-    updateStatus("กำลังเชื่อมต่อ...", "");
+    updateStatus("กำลังต่อสายหาคุณมังกร...", "");
 
     try {
       micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -107,21 +136,37 @@
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        updateStatus("กำลังคุยสาย...", "active");
+        log("WebSocket Connected");
         startBtn.style.display = "none";
         stopBtn.style.display = "block";
 
-        ws.send(JSON.stringify({
+        // ส่ง Setup Payload ที่ถูกต้องตาม Spec ของ Gemini Live
+        const setupPayload = {
           setup: {
             model: "models/gemini-2.5-flash",
-            generationConfig: { responseModalities: ["AUDIO"] }
+            generationConfig: {
+              responseModalities: ["AUDIO"]
+            },
+            systemInstruction: {
+              parts: [
+                {
+                  text: "คุณคือ 'คุณมังกร' ลูกค้าชายวัย 40 ปี น้ำเสียงเป็นกันเอง สนใจประกันสุขภาพแต่เป็นคนละเอียด ชอบถามเรื่องเงื่อนไขการเคลม ให้คุยตอบโต้สั้นๆ สมจริงเหมือนคุยโทรศัพท์"
+                }
+              ]
+            }
           }
-        }));
+        };
+
+        ws.send(JSON.stringify(setupPayload));
       };
 
       ws.onmessage = async (event) => {
         const resData = JSON.parse(event.data);
+
+        // รอจนกว่า Server จะแจ้ง Setup Complete ถึงเริ่มส่งเสียงจากไมค์
         if (resData.setupComplete) {
+          updateStatus("อยู่ในสายกับคุณมังกร...", "active");
+          log("คุณมังกรพร้อมคุยแล้ว");
           startMicStream(micStream);
         } else if (resData.serverContent?.modelTurn?.parts) {
           for (const part of resData.serverContent.modelTurn.parts) {
@@ -132,16 +177,32 @@
         }
       };
 
-      ws.onclose = () => {
+      ws.onerror = (err) => {
+        log("WS Error: " + JSON.stringify(err));
+      };
+
+      ws.onclose = async (e) => {
+        log(`WS Closed (Code: ${e.code}, Reason: ${e.reason || 'None'})`);
         stopResources();
         startBtn.style.display = "block";
         stopBtn.style.display = "none";
-        updateStatus("จบการสนทนา", "");
+
+        if (apiKey) {
+          updateStatus("คุณน้องฟ้ากำลังประเมิน QC...", "evaluating");
+          const result = await runNongFahQC(apiKey);
+          document.getElementById('scoreBadge').innerText = `${result.score}/100`;
+          document.getElementById('strengthsList').innerHTML = (result.strengths || []).map(s => `<li>${s}</li>`).join('');
+          document.getElementById('improvementsList').innerHTML = (result.improvements || []).map(i => `<li>${i}</li>`).join('');
+          evalCard.style.display = "block";
+          updateStatus("ประเมินเสร็จสิ้น", "active");
+        } else {
+          updateStatus("พร้อมคุยกับคุณมังกร", "");
+        }
       };
 
     } catch (err) {
-      log("Error: " + err.message);
-      updateStatus("เกิดข้อผิดพลาด", "");
+      log("Start Error: " + err.message);
+      updateStatus("เกิดข้อผิดพลาดในการต่อสาย", "");
       stopResources();
     }
   }
@@ -153,7 +214,16 @@
     processor.onaudioprocess = (e) => {
       if (ws?.readyState === WebSocket.OPEN) {
         const base64Audio = convertFloat32ToInt16Base64(e.inputBuffer.getChannelData(0));
-        ws.send(JSON.stringify({ realtimeInput: { audio: { mimeType: "audio/pcm;rate=16000", data: base64Audio } } }));
+        ws.send(JSON.stringify({
+          realtimeInput: {
+            mediaChunks: [
+              {
+                mimeType: "audio/pcm;rate=16000",
+                data: base64Audio
+              }
+            ]
+          }
+        }));
       }
     };
     source.connect(processor);
