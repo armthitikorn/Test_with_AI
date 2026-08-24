@@ -192,13 +192,13 @@
     <div id="avatarRing" class="avatar-ring"></div>
     <div id="avatarImg" class="avatar-img">
       <!-- SVG Avatar ชาย (คุณมังกร) -->
-      <svg id="svgDragon" width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)">
+      <svg id="svgDragon" width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="50" cy="50" r="50" fill="#3B82F6" fill-opacity="0.15"/>
         <path d="M50 40C58.2843 40 65 33.2843 65 25C65 16.7157 58.2843 10 50 10C41.7157 10 35 16.7157 35 25C35 33.2843 41.7157 40 50 40Z" fill="#1E293B"/>
         <path d="M50 46C34.536 46 22 58.536 22 74C22 77.314 24.686 80 28 80H72C75.314 80 78 77.314 78 74C78 58.536 65.464 46 50 46Z" fill="#1E293B"/>
       </svg>
       <!-- SVG Avatar หญิง (คุณฟ้า) -->
-      <svg id="svgFah" style="display:none;" width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)">
+      <svg id="svgFah" style="display:none;" width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="50" cy="50" r="50" fill="#EC4899" fill-opacity="0.15"/>
         <path d="M50 42C57.732 42 64 35.732 64 28C64 20.268 57.732 14 50 14C42.268 14 36 20.268 36 28C36 35.732 42.268 42 50 42Z" fill="#831843"/>
         <path d="M50 46C34.536 46 22 58.536 22 74C22 77.314 24.686 80 28 80H72C75.314 80 78 77.314 78 74C78 58.536 65.464 46 50 46Z" fill="#EC4899"/>
@@ -242,7 +242,7 @@
 </div>
 
 <script>
-  let currentPersona = 'dragon'; // 'dragon' หรือ 'fah'
+  let currentPersona = 'dragon';
 
   const personas = {
     dragon: {
@@ -396,87 +396,7 @@
       nextStartTime = audioCtx.currentTime;
 
       const activePersonaData = personas[currentPersona];
-      const wsUrl = `wss://[generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=$](https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=$){apiKey}`;
-      
-      ws = new WebSocket(wsUrl);
-
-      ws.onopen = () => {
-        log(`เชื่อมต่อสำเร็จ คาแรคเตอร์: ${activePersonaData.name}`);
-        updateStatus("เชื่อมต่อสำเร็จ! กำลังส่ง Setup...", "active");
-        startBtn.style.display = "none";
-        stopBtn.style.display = "block";
-
-        const setupMessage = {
-          setup: {
-            model: "models/gemini-2.5-flash", // ใช้ Gemini 2.5 Flash เพื่อความเสถียรสูงสุดตามบริบท
-            generationConfig: {
-              responseModalities: ["AUDIO"],
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: { voiceName: activePersonaData.voice }
-                }
-              }
-            },
-            systemInstruction: {
-              parts: [{ text: activePersonaData.instruction }]
-            }
-          }
-        };
-        ws.send(JSON.stringify(setupMessage));
-      };
-
-      ws.onmessage = async (event) => {
-        try {
-          let rawData = event.data;
-          if (rawData instanceof Blob) rawData = await rawData.text();
-          let resData = JSON.parse(rawData);
-
-          if (resData.setupComplete) {
-            updateStatus("กำลังสนทนา (พูดเสนอขายได้เลย)", "active");
-            startMicStream(micStream);
-            return;
-          }
-
-          // บันทึกบทสนทนาฝั่งลูกค้าเมื่อได้รับข้อความเสียง/ข้อความตอบกลับ
-          if (resData.serverContent && resData.serverContent.modelTurn) {
-            const parts = resData.serverContent.modelTurn.parts;
-            for (const part of parts) {
-              if (part.text) {
-                conversationTranscript.push({ role: `Customer (${currentPersona})`, text: part.text });
-              }
-              if (part.inlineData && part.inlineData.mimeType && part.inlineData.mimeType.startsWith("audio/pcm")) {
-                await playAudioChunk(part.inlineData.data);
-              }
-            }
-          }
-  async function startSession() {
-    log("กำลังเริ่มกระบวนการ...");
-    updateStatus("กำลังขอสิทธิ์ไมโครโฟน...", "");
-    startBtn.disabled = true;
-    evalCard.style.display = "none";
-    downloadBtn.style.display = "none";
-    conversationTranscript = [];
-
-    try {
-      micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } });
-      const response = await fetch('/api/live');
-      const data = await response.json();
-
-      if (!data.key) {
-        updateStatus("ไม่พบ GEMINI_API_KEY", "error");
-        startBtn.disabled = false;
-        return;
-      }
-      apiKey = data.key;
-
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
-      if (audioCtx.state === 'suspended') await audioCtx.resume();
-      nextStartTime = audioCtx.currentTime;
-
-      const activePersonaData = personas[currentPersona];
-      
-      // ✅ แก้ไขบรรทัดนี้เรียบร้อยครับ
-      const wsUrl = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=" + apiKey;
+      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
       
       ws = new WebSocket(wsUrl);
 
@@ -556,9 +476,6 @@
       const source = inputAudioCtx.createMediaStreamSource(stream);
       processor = inputAudioCtx.createScriptProcessor(4096, 1, 1);
       
-      // บันทึกการส่งเสียงพนักงานขายเป็น Transcript จำลองไว้คร่าวๆ เพื่อให้ QC มีข้อมูลประเมิน
-      let userSpokenCount = 1;
-      
       processor.onaudioprocess = (e) => {
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
         const inputData = e.inputBuffer.getChannelData(0);
@@ -569,7 +486,6 @@
         }));
       };
 
-      // เพิ่มระบบบันทึก Log ฝั่งพนักงานเมื่อมีการพูดคุย
       conversationTranscript.push({ role: "Telesales Agent", text: "[บันทึกเสียงสนทนาสดจากพนักงานขายผ่านไมโครโฟน]" });
 
       source.connect(processor);
@@ -612,7 +528,7 @@
     บทสนทนา: ${JSON.stringify(conversationTranscript)}`;
 
     try {
-      const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$){apiKey}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -627,7 +543,6 @@
       }
 
       let rawJsonText = data.candidates[0].content.parts[0].text;
-      // ทำความสะอาดข้อความเผื่อติด markdown block
       rawJsonText = rawJsonText.replace(/```json/g, '').replace(/```/g, '').trim();
       
       currentEvaluationData = JSON.parse(rawJsonText);
