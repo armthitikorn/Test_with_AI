@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Telesales Live Simulator - Multi-Persona & QC</title>
+  <title>Telesales Live Simulator - Multi-Persona & QC (Gemini 3.1 Flash)</title>
   <style>
     * { box-sizing: border-box; }
     body { 
@@ -22,7 +22,7 @@
       border-radius: 24px; 
       box-shadow: 0 10px 30px rgba(0,0,0,0.08); 
       width: 100%; 
-      max-width: 480px; 
+      max-width: 500px; 
       text-align: center; 
     }
     h2 { color: #1e293b; margin: 0 0 4px 0; font-size: 22px; }
@@ -141,7 +141,7 @@
       font-size: 11px;
       text-align: left;
       border-radius: 8px;
-      max-height: 100px;
+      max-height: 120px;
       overflow-y: auto;
       white-space: pre-wrap;
       word-break: break-all;
@@ -165,39 +165,35 @@
       padding-bottom: 12px;
       margin-bottom: 12px;
     }
-    .score-badge { font-size: 24px; font-weight: 800; color: #2563eb; }
+    .score-badge { font-size: 26px; font-weight: 800; color: #2563eb; }
     .eval-section { margin-bottom: 12px; }
     .eval-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
     .text-green { color: #166534; }
     .text-amber { color: #b45309; }
     .text-red { color: #991b1b; }
     .fatal-box { background: #fef2f2; border: 1px solid #fca5a5; padding: 10px; border-radius: 8px; font-size: 13px; }
-    .eval-list { margin: 0; padding-left: 20px; font-size: 13px; color: #334155; }
+    .eval-list { margin: 0; padding-left: 20px; font-size: 13px; color: #334155; line-height: 1.6; }
   </style>
 </head>
 <body>
 
 <div class="card">
   <h2>Telesales Live Simulator</h2>
-  <p>ระบบฝึกซ้อมโทรเสนอขายประกันภัยรถยนต์</p>
+  <p>ระบบฝึกซ้อมเสนอขายประกันภัยพร้อมประเมินผล QC อัตโนมัติ</p>
   
-  <!-- เลือกคาแรคเตอร์ลูกค้า -->
   <div class="persona-selector">
     <button id="btnDragon" class="persona-btn active" onclick="switchPersona('dragon')">👨‍💼 คุณมังกร (ชาย)</button>
     <button id="btnFah" class="persona-btn" onclick="switchPersona('fah')">👩‍💼 คุณฟ้า (หญิง)</button>
   </div>
 
-  <!-- Avatar Display -->
   <div class="avatar-container">
     <div id="avatarRing" class="avatar-ring"></div>
     <div id="avatarImg" class="avatar-img">
-      <!-- SVG Avatar ชาย (คุณมังกร) -->
       <svg id="svgDragon" width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="50" cy="50" r="50" fill="#3B82F6" fill-opacity="0.15"/>
         <path d="M50 40C58.2843 40 65 33.2843 65 25C65 16.7157 58.2843 10 50 10C41.7157 10 35 16.7157 35 25C35 33.2843 41.7157 40 50 40Z" fill="#1E293B"/>
         <path d="M50 46C34.536 46 22 58.536 22 74C22 77.314 24.686 80 28 80H72C75.314 80 78 77.314 78 74C78 58.536 65.464 46 50 46Z" fill="#1E293B"/>
       </svg>
-      <!-- SVG Avatar หญิง (คุณฟ้า) -->
       <svg id="svgFah" style="display:none;" width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="50" cy="50" r="50" fill="#EC4899" fill-opacity="0.15"/>
         <path d="M50 42C57.732 42 64 35.732 64 28C64 20.268 57.732 14 50 14C42.268 14 36 20.268 36 28C36 35.732 42.268 42 50 42Z" fill="#831843"/>
@@ -216,7 +212,6 @@
   <button id="startBtn" class="btn">เริ่มการสนทนา (Start Call)</button>
   <button id="stopBtn" class="btn btn-stop" style="display: none;">จบการสนทนา (End Call)</button>
 
-  <!-- QC Card -->
   <div id="evalCard" class="eval-card">
     <div class="eval-header">
       <h3 style="margin:0; font-size:16px; color:#1e293b;">ผลการประเมิน QC</h3>
@@ -242,30 +237,28 @@
 </div>
 
 <script>
-  let currentPersona = 'dragon'; // 'dragon' หรือ 'fah'
+  let currentPersona = 'dragon';
 
   const personas = {
     dragon: {
       name: "คุณมังกร (ลูกค้าชาย สายเหตุผล)",
       tag: "เสียง: สุขุม นุ่มลึก (Charon)",
       voice: "Charon",
-      instruction: "คุณคือลูกค้าชื่อ 'คุณมังกร' (น้ำเสียงผู้ชายสุขุม นุ่มลึก เป็นผู้ใหญ่)\n" +
-                   "กฎสำคัญที่สุด:\n" +
-                   "1. ตอบกระชับ สั้นๆ ไม่เกิน 1-2 ประโยคต่อรอบเท่านั้น\n" +
-                   "2. เมื่อพูดจบให้หยุดรอฟังทันที\n" +
-                   "3. ทักทายตอนเริ่มสายว่า 'ฮัลโหล สวัสดีครับ จากไหนเหรอครับ' แล้วหยุดฟัง\n" +
-                   "4. ใช้เหตุผลประกอบการตัดสินใจ ซื้อยากถ้าไม่มีเหตุผลรองรับที่ดีพอ"
+      instruction: "คุณคือลูกค้าชื่อ 'คุณมังกร' (ผู้ชายสุขุม เป็นผู้ใหญ่)\n" +
+                   "กฎการสนทนา:\n" +
+                   "1. ตอบสั้นกระชับ ไม่เกิน 1-2 ประโยคต่อรอบ\n" +
+                   "2. ทักทายตอนเริ่มสายว่า 'ฮัลโหล สวัสดีครับ จากไหนครับ'\n" +
+                   "3. ซื้อยาก ต้องมีเหตุผลคุ้มค่ารองรับเสมอ"
     },
     fah: {
       name: "คุณฟ้า (ลูกค้าหญิง เป็นกันเอง)",
       tag: "เสียง: นุ่มนวล เป็นธรรมชาติ (Kore)",
-      voice: "Kore", // เปลี่ยนมาใช้เสียง Kore ซึ่งเป็นเสียงผู้หญิงนุ่มนวล เป็นธรรมชาติที่สุด
-      instruction: "คุณคือลูกค้าชื่อ 'คุณฟ้า' (น้ำเสียงผู้หญิง นุ่มนวล เป็นกันเอง สุภาพ)\n" +
-                   "กฎสำคัญที่สุด:\n" +
-                   "1. ตอบกระชับ สั้นๆ ไม่เกิน 1-2 ประโยคต่อรอบเท่านั้น\n" +
-                   "2. เมื่อพูดจบให้หยุดรอฟังทันที\n" +
-                   "3. ทักทายตอนเริ่มสายว่า 'ฮัลโหล สวัสดีค่ะ จากไหนเหรอคะ' แล้วหยุดฟัง\n" +
-                   "4. สนใจเรื่องความคุ้มค่าและโปรโมชั่นพิเศษ"
+      voice: "Kore",
+      instruction: "คุณคือลูกค้าชื่อ 'คุณฟ้า' (ผู้หญิง นุ่มนวล สุภาพ)\n" +
+                   "กฎการสนทนา:\n" +
+                   "1. ตอบสั้นกระชับ ไม่เกิน 1-2 ประโยคต่อรอบ\n" +
+                   "2. ทักทายตอนเริ่มสายว่า 'ฮัลโหล สวัสดีค่ะ จากไหนเหรอคะ'\n" +
+                   "3. สนใจเรื่องสิทธิประโยชน์และส่วนลดโปรโมชั่น"
     }
   };
 
@@ -273,10 +266,8 @@
     currentPersona = type;
     document.getElementById('btnDragon').className = `persona-btn ${type === 'dragon' ? 'active' : ''}`;
     document.getElementById('btnFah').className = `persona-btn ${type === 'fah' ? 'active' : ''}`;
-    
     document.getElementById('customerName').innerText = personas[type].name;
     document.getElementById('customerTag').innerText = personas[type].tag;
-    
     document.getElementById('svgDragon').style.display = type === 'dragon' ? 'block' : 'none';
     document.getElementById('svgFah').style.display = type === 'fah' ? 'block' : 'none';
   }
@@ -296,7 +287,11 @@
   let inputAudioCtx = null;
   let nextStartTime = 0;
   let apiKey = null;
-
+  let recognition = null;
+  
+  // สถานะและตัวแปรจัดการเวลาที่เพิ่มเข้ามาใหม่
+  let isCalling = false;
+  let speakingTimeout = null;
   let conversationTranscript = [];
   let currentEvaluationData = null;
 
@@ -316,6 +311,7 @@
     else avatarRing.classList.remove('speaking');
   }
 
+  // แปลง Audio Data จาก Float32 เป็น PCM 16Bit Base64
   function convertFloat32ToInt16Base64(buffer) {
     let l = buffer.length;
     let buf = new Int16Array(l);
@@ -325,25 +321,26 @@
     }
     let binary = '';
     let bytes = new Uint8Array(buf.buffer);
-    let len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
+    for (let i = 0; i < bytes.byteLength; i++) {
       binary += String.fromCharCode(bytes[i]);
     }
     return btoa(binary);
   }
 
+  // เล่นเสียงตอบกลับ PCM จาก AI
   async function playAudioChunk(base64Pcm) {
     if (!audioCtx) return;
     if (audioCtx.state === 'suspended') await audioCtx.resume();
 
     try {
       setAvatarSpeaking(true);
-      const binaryString = atob(base64Pcm);
-      const len = binaryString.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
+      if (speakingTimeout) clearTimeout(speakingTimeout); // ยกเลิกการปิดไฟวงแหวนอันเก่าหากเสียงมาต่อเนื่อง
 
-      const int16Array = new Int16Array(bytes.buffer, bytes.byteOffset, len / 2);
+      const binaryString = atob(base64Pcm);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+
+      const int16Array = new Int16Array(bytes.buffer);
       const float32Array = new Float32Array(int16Array.length);
       for (let i = 0; i < int16Array.length; i++) float32Array[i] = int16Array[i] / 32768.0;
 
@@ -360,24 +357,79 @@
       source.start(nextStartTime);
       nextStartTime += audioBuffer.duration;
 
-      setTimeout(() => {
-        if (audioCtx && audioCtx.currentTime >= nextStartTime - 0.1) {
-          setAvatarSpeaking(false);
-        }
-      }, audioBuffer.duration * 1000);
+      // ปิดไฟวงแหวนเมื่อสิ้นสุดคิวเสียงทั้งหมด
+      const timeRemainingMs = (nextStartTime - audioCtx.currentTime) * 1000;
+      speakingTimeout = setTimeout(() => {
+        setAvatarSpeaking(false);
+      }, Math.max(0, timeRemainingMs));
+
     } catch (e) {
-      log("Error audio: " + e.message);
+      log("Error audio playback: " + e.message);
       setAvatarSpeaking(false);
     }
   }
 
+  // ระบบ Speech-To-Text ฝั่งพนักงาน
+  function startSpeechToText() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      log("เบราว์เซอร์ไม่รองรับ Speech Recognition (แนะนำใช้ Chrome)");
+      return;
+    }
+    
+    recognition = new SpeechRecognition();
+    recognition.lang = 'th-TH';
+    recognition.continuous = true;
+    recognition.interimResults = false;
+
+    recognition.onresult = (event) => {
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          const text = event.results[i][0].transcript.trim();
+          if (text) {
+            conversationTranscript.push({ role: "พนักงานขาย (Telesales)", text: text });
+            log(`[พนักงาน]: ${text}`);
+          }
+        }
+      }
+    };
+
+    // Auto Restart ป้องกันไมค์ตัดเองเมื่อเงียบเกิน 10-15 วินาที
+    recognition.onend = () => {
+      if (isCalling) {
+        setTimeout(() => {
+          if (isCalling && recognition) {
+            try { 
+              recognition.start(); 
+            } catch(e) { 
+              log("STT Restart Notice: " + e.message); 
+            }
+          }
+        }, 300);
+      }
+    };
+
+    recognition.onerror = (e) => log("STT Error: " + e.error);
+    recognition.start();
+  }
+
+  function stopSpeechToText() {
+    if (recognition) {
+      recognition.onend = null;
+      recognition.stop();
+      recognition = null;
+    }
+  }
+
   async function startSession() {
-    log("กำลังเริ่มกระบวนการ...");
-    updateStatus("กำลังขอสิทธิ์ไมโครโฟน...", "");
+    log("กำลังเริ่มเชื่อมต่อระบบ...");
+    updateStatus("กำลังขอสิทธิ์ใช้งานไมโครโฟน...", "");
     startBtn.disabled = true;
     evalCard.style.display = "none";
     downloadBtn.style.display = "none";
     conversationTranscript = [];
+    isCalling = true;
+    nextStartTime = 0;
 
     try {
       micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } });
@@ -387,6 +439,7 @@
       if (!data.key) {
         updateStatus("ไม่พบ GEMINI_API_KEY", "error");
         startBtn.disabled = false;
+        isCalling = false;
         return;
       }
       apiKey = data.key;
@@ -396,13 +449,13 @@
       nextStartTime = audioCtx.currentTime;
 
       const activePersonaData = personas[currentPersona];
-      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
       
+      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        log(`เชื่อมต่อสำเร็จ คาแรคเตอร์: ${activePersonaData.name}`);
-        updateStatus("เชื่อมต่อสำเร็จ! กำลังส่ง Setup...", "active");
+        log(`เชื่อมต่อ Live API สำเร็จ (${activePersonaData.name})`);
+        updateStatus("ส่งการตั้งค่าไปยัง AI...", "active");
         startBtn.style.display = "none";
         stopBtn.style.display = "block";
 
@@ -434,6 +487,7 @@
           if (resData.setupComplete) {
             updateStatus("กำลังสนทนา (พูดเสนอขายได้เลย)", "active");
             startMicStream(micStream);
+            startSpeechToText();
             return;
           }
 
@@ -441,7 +495,8 @@
             const parts = resData.serverContent.modelTurn.parts;
             for (const part of parts) {
               if (part.text) {
-                conversationTranscript.push({ role: `Customer (${currentPersona})`, text: part.text });
+                conversationTranscript.push({ role: `ลูกค้า (${currentPersona})`, text: part.text });
+                log(`[ลูกค้า]: ${part.text}`);
               }
               if (part.inlineData && part.inlineData.mimeType && part.inlineData.mimeType.startsWith("audio/pcm")) {
                 await playAudioChunk(part.inlineData.data);
@@ -454,7 +509,6 @@
       };
 
       ws.onclose = () => {
-        setAvatarSpeaking(false);
         stopSessionResources();
         startBtn.style.display = "block";
         startBtn.disabled = false;
@@ -464,7 +518,7 @@
 
     } catch (err) {
       log("Error: " + err.message);
-      updateStatus("เปิดไมค์หรือดึง Key ไม่สำเร็จ", "error");
+      updateStatus("เปิดไมค์หรือสตรีมไม่สำเร็จ", "error");
       startBtn.disabled = false;
       stopSessionResources();
     }
@@ -493,11 +547,15 @@
   }
 
   function stopSessionResources() {
+    isCalling = false;
+    if (speakingTimeout) clearTimeout(speakingTimeout);
     setAvatarSpeaking(false);
+    stopSpeechToText();
     if (processor) { processor.disconnect(); processor = null; }
     if (inputAudioCtx) { inputAudioCtx.close(); inputAudioCtx = null; }
     if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
     if (audioCtx) { audioCtx.close(); audioCtx = null; }
+    nextStartTime = 0;
   }
 
   function stopSession() {
@@ -505,58 +563,89 @@
     stopSessionResources();
   }
 
+  // ระบบประเมิน QC หลังจบการสนทนา
   async function evaluateSession() {
     if (!apiKey) return;
     updateStatus("กำลังวิเคราะห์ผลการประเมิน QC...", "evaluating");
 
     if (!conversationTranscript || conversationTranscript.length === 0) {
-      conversationTranscript.push({ role: "System", text: "จบการสนทนาก่อนเริ่มพูดคุย" });
+      conversationTranscript.push({ role: "System", text: "ไม่มีบทสนทนา หรือจบสายก่อนการพูดคุย" });
     }
 
     const promptText = `
-    คุณคือผู้เชี่ยวชาญด้าน QC สาย Telesales ประกันภัย 
-    โปรดวิเคราะห์บทสนทนานี้และตอบกลับมาเป็น JSON ตามโครงสร้างนี้เท่านั้น:
+    คุณคือผู้เชี่ยวชาญด้าน QC สาย Telesales ประกันภัยรถยนต์
+    โปรดวิเคราะห์บทสนทนาฝั่งพนักงานขายประกันที่คุยกับลูกค้า persona: "${personas[currentPersona].name}" 
+    และประเมินผลการเสนอขายอย่างละเอียด
+    
+    บทสนทนาที่บันทึกได้:
+    ${JSON.stringify(conversationTranscript, null, 2)}
+
+    ตอบกลับในรูปแบบ JSON ตามโครงสร้างนี้เท่านั้น:
     {
       "score": 85,
-      "strengths": ["ข้อดี 1"],
-      "improvements": ["จุดพัฒนา 1"],
-      "fatalMistakes": ["ข้อห้ามวิกฤต (ถ้าไม่มีให้ใส่ว่าง)"]
-    }
-    บทสนทนา: ${JSON.stringify(conversationTranscript)}`;
+      "strengths": ["ข้อดี 1", "ข้อดี 2"],
+      "improvements": ["จุดที่ต้องปรับปรุง 1", "จุดที่ต้องปรับปรุง 2"],
+      "fatalMistakes": ["ข้อผิดพลาดร้ายแรง/คำต้องห้าม (ถ้าไม่มีให้ใส่อาร์เรย์ว่าง)"]
+    }`;
 
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-live-preview:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }], generationConfig: { responseMimeType: "application/json" } })
+        body: JSON.stringify({ 
+          contents: [{ parts: [{ text: promptText }] }], 
+          generationConfig: { responseMimeType: "application/json" } 
+        })
       });
+
+      if (!res.ok) {
+        const errJson = await res.json();
+        throw new Error(errJson.error?.message || `HTTP error ${res.status}`);
+      }
+
       const data = await res.json();
-      currentEvaluationData = JSON.parse(data.candidates[0].content.parts[0].text);
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
       
-      document.getElementById('scoreBadge').innerText = `${currentEvaluationData.score}/100`;
-      document.getElementById('strengthsList').innerHTML = currentEvaluationData.strengths.map(s => `<li>${s}</li>`).join('');
-      document.getElementById('improvementsList').innerHTML = currentEvaluationData.improvements.map(i => `<li>${i}</li>`).join('');
+      if (!rawText) throw new Error("ไม่ได้รับข้อมูล JSON จาก Gemini API");
+
+      currentEvaluationData = JSON.parse(rawText);
+      
+      document.getElementById('scoreBadge').innerText = `${currentEvaluationData.score || 0}/100`;
+      document.getElementById('strengthsList').innerHTML = (currentEvaluationData.strengths || []).map(s => `<li>${s}</li>`).join('');
+      document.getElementById('improvementsList').innerHTML = (currentEvaluationData.improvements || []).map(i => `<li>${i}</li>`).join('');
       
       const fatalBox = document.getElementById('fatalBox');
-      if (currentEvaluationData.fatalMistakes?.[0]) {
+      if (currentEvaluationData.fatalMistakes && currentEvaluationData.fatalMistakes.length > 0 && currentEvaluationData.fatalMistakes[0] !== "") {
         fatalBox.className = "fatal-box text-red";
         fatalBox.innerHTML = `⚠️ ${currentEvaluationData.fatalMistakes.join('<br>')}`;
       } else {
         fatalBox.className = "fatal-box text-green";
-        fatalBox.innerHTML = "✅ ไม่พบข้อห้ามวิกฤต";
+        fatalBox.innerHTML = "✅ ไม่พบข้อผิดพลาดร้ายแรง";
       }
 
       evalCard.style.display = "block";
       downloadBtn.style.display = "block";
       updateStatus("การประเมิน QC เสร็จสิ้น", "active");
+      log("การประเมินผล QC เสร็จสมบูรณ์");
     } catch (e) {
-      updateStatus("การวิเคราะห์ QC ขัดข้อง", "error");
+      log("QC Error: " + e.message);
+      updateStatus("การวิเคราะห์ QC ขัดข้อง (" + e.message + ")", "error");
     }
   }
 
+  // ดาวน์โหลดรายงาน QC เป็นไฟล์ Text
   downloadBtn.addEventListener('click', () => {
     if (!currentEvaluationData) return;
-    const reportText = `รายงาน QC Telesales (${personas[currentPersona].name})\nคะแนน: ${currentEvaluationData.score}/100\nจุดแข็ง:\n- ${currentEvaluationData.strengths.join('\n- ')}\nจุดพัฒนา:\n- ${currentEvaluationData.improvements.join('\n- ')}`;
+    const reportText = `=== รายงานประเมิน QC Telesales ===\n` +
+      `ลูกค้า: ${personas[currentPersona].name}\n` +
+      `วันที่ประเมิน: ${new Date().toLocaleString('th-TH')}\n` +
+      `คะแนนสุทธิ: ${currentEvaluationData.score}/100\n\n` +
+      `[จุดแข็ง]\n- ${currentEvaluationData.strengths.join('\n- ')}\n\n` +
+      `[จุดที่ต้องปรับปรุง]\n- ${currentEvaluationData.improvements.join('\n- ')}\n\n` +
+      `[ข้อผิดพลาดร้ายแรง]\n- ${(currentEvaluationData.fatalMistakes.length > 0 && currentEvaluationData.fatalMistakes[0] !== '') ? currentEvaluationData.fatalMistakes.join('\n- ') : 'ไม่มี'}\n\n` +
+      `=== บันทึกบทสนทนา ===\n` +
+      conversationTranscript.map(t => `${t.role}: ${t.text}`).join('\n');
+
     const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
