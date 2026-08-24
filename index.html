@@ -176,7 +176,6 @@
 
         const setupMessage = {
           setup: {
-            // แก้ไขเป็นชื่อโมเดล Live API ที่ถูกต้อง
             model: "models/gemini-3.1-flash-live-preview",
             generationConfig: {
               responseModalities: ["AUDIO"],
@@ -207,8 +206,20 @@
           let resData = JSON.parse(rawData);
 
           if (resData.setupComplete) {
-            log("Setup Complete! พร้อมรับเสียงจาก AI แล้ว");
-            updateStatus("พร้อมสนทนา (กำลังฟัง/รอเสียงตอบกลับ)", "active");
+            log("Setup Complete! ส่งคำทักทายเปิดสาย...");
+            updateStatus("กำลังสนทนากับน้องฟ้า...", "active");
+            
+            // ส่งข้อความกระตุ้นให้ AI (น้องฟ้า) เริ่มพูดทักทายกลับมาทันที
+            const initialTurn = {
+              clientContent: {
+                turns: [{
+                  role: "user",
+                  parts: [{ text: "สวัสดีครับน้องฟ้า ติดต่อสอบถามเรื่องประกันภัยรถยนต์ใช่ไหมครับ" }]
+                }],
+                turnComplete: true
+              }
+            };
+            ws.send(JSON.stringify(initialTurn));
             return;
           }
 
