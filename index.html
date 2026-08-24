@@ -118,7 +118,6 @@
         bytes[i] = binaryString.charCodeAt(i);
       }
 
-      // Safe Uint8Array to Int16Array conversion using byteOffset and exact length
       const int16Array = new Int16Array(bytes.buffer, bytes.byteOffset, len / 2);
       const float32Array = new Float32Array(int16Array.length);
       for (let i = 0; i < int16Array.length; i++) {
@@ -177,7 +176,7 @@
 
         const setupMessage = {
           setup: {
-            model: "models/gemini-2.0-flash-exp",
+            model: "models/gemini-2.5-flash",
             generationConfig: {
               responseModalities: ["AUDIO"],
               speechConfig: {
@@ -200,28 +199,15 @@
 
       ws.onmessage = async (event) => {
         try {
-          let resData;
-          if (event.data instanceof Blob) {
-            const text = await event.data.text();
-            resData = JSON.parse(text);
-          } else {
-            resData = JSON.parse(event.data);
+          let rawData = event.data;
+          if (rawData instanceof Blob) {
+            rawData = await rawData.text();
           }
+          let resData = JSON.parse(rawData);
 
           if (resData.setupComplete) {
-            log("Setup Complete! ส่งคำทักทายเปิดสาย...");
-            updateStatus("พร้อมสนทนา (กำลังพูดคุย)", "active");
-            
-            const clientContent = {
-              clientContent: {
-                turns: [{ 
-                  role: "user", 
-                  parts: [{ text: "สวัสดีครับน้องฟ้า มีอะไรให้ช่วยเหลือไหมครับ" }] 
-                }],
-                turnComplete: true
-              }
-            };
-            ws.send(JSON.stringify(clientContent));
+            log("Setup Complete! พร้อมรับเสียงจาก AI แล้ว");
+            updateStatus("พร้อมสนทนา (กำลังฟัง/รอเสียงตอบกลับ)", "active");
             return;
           }
 
