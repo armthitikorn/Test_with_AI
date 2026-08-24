@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gemini Live Audio Simulator - Sales PoC</title>
+  <title>Gemini Live Audio Simulator - Avatar & QC Edition</title>
   <style>
     * { box-sizing: border-box; }
     body { 
@@ -19,25 +19,86 @@
     .card { 
       background: white; 
       padding: 32px 24px; 
-      border-radius: 20px; 
-      box-shadow: 0 10px 25px rgba(0,0,0,0.08); 
+      border-radius: 24px; 
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08); 
       width: 100%; 
-      max-width: 460px; 
+      max-width: 480px; 
       text-align: center; 
     }
-    h2 { color: #1e293b; margin: 0 0 8px 0; font-size: 22px; }
+    h2 { color: #1e293b; margin: 0 0 4px 0; font-size: 22px; }
     p { color: #64748b; font-size: 14px; margin: 0 0 20px 0; line-height: 1.5; }
+    
+    /* Profile & Avatar Section */
+    .avatar-container {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 16px auto;
+    }
+    .avatar-ring {
+      position: absolute;
+      top: -6px;
+      left: -6px;
+      width: 132px;
+      height: 132px;
+      border-radius: 50%;
+      border: 4px solid #3b82f6;
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+    .avatar-ring.speaking {
+      opacity: 1;
+      animation: pulse-ring 1.5s infinite ease-in-out;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
+      70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+    }
+    .avatar-img {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: #e2e8f0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      border: 3px solid #ffffff;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .customer-info {
+      margin-bottom: 16px;
+    }
+    .customer-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .customer-tag {
+      font-size: 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      padding: 4px 10px;
+      border-radius: 20px;
+      display: inline-block;
+      margin-top: 4px;
+      font-weight: 600;
+    }
+
     .status-box { 
-      padding: 14px; 
+      padding: 12px; 
       border-radius: 12px; 
       font-weight: 600; 
-      font-size: 15px;
+      font-size: 14px;
       margin-bottom: 16px; 
       background: #f1f5f9; 
       color: #475569; 
     }
     .status-box.active { background: #dcfce7; color: #15803d; }
     .status-box.error { background: #fee2e2; color: #b91c1c; }
+    .status-box.evaluating { background: #fef3c7; color: #d97706; }
+    
     .btn { 
       background: #2563eb; 
       color: white; 
@@ -51,6 +112,7 @@
     }
     .btn:disabled { background: #cbd5e1; cursor: not-allowed; }
     .btn-stop { background: #ef4444; }
+    .btn-download { background: #059669; margin-top: 12px; display: none; }
     
     .log-box {
       margin-top: 20px;
@@ -58,26 +120,97 @@
       background: #0f172a;
       color: #38bdf8;
       font-family: monospace;
-      font-size: 12px;
+      font-size: 11px;
       text-align: left;
       border-radius: 8px;
-      max-height: 180px;
+      max-height: 120px;
       overflow-y: auto;
       white-space: pre-wrap;
       word-break: break-all;
     }
+
+    /* QC Report Styles */
+    .eval-card {
+      display: none;
+      margin-top: 20px;
+      padding: 20px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      text-align: left;
+    }
+    .eval-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 12px;
+      margin-bottom: 12px;
+    }
+    .score-badge { font-size: 24px; font-weight: 800; color: #2563eb; }
+    .eval-section { margin-bottom: 12px; }
+    .eval-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+    .text-green { color: #166534; }
+    .text-amber { color: #b45309; }
+    .text-red { color: #991b1b; }
+    .fatal-box { background: #fef2f2; border: 1px solid #fca5a5; padding: 10px; border-radius: 8px; font-size: 13px; }
+    .eval-list { margin: 0; padding-left: 20px; font-size: 13px; color: #334155; }
   </style>
 </head>
 <body>
 
 <div class="card">
-  <h2>Gemini Live Audio PoC</h2>
-  <p>ระบบจำลองการขายประกันรถยนต์ (Short & Rational Response)</p>
+  <h2>Telesales Live Simulator</h2>
+  <p>ระบบฝึกซ้อมโทรเสนอขายประกันภัยรถยนต์</p>
   
+  <!-- Customer Avatar Display -->
+  <div class="avatar-container">
+    <div id="avatarRing" class="avatar-ring"></div>
+    <div class="avatar-img">
+      <!-- SVG Vector Avatar ของคุณฟ้า -->
+      <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="50" cy="50" r="50" fill="#3B82F6" fill-opacity="0.15"/>
+        <path d="M50 42C57.732 42 64 35.732 64 28C64 20.268 57.732 14 50 14C42.268 14 36 20.268 36 28C36 35.732 42.268 42 50 42Z" fill="#1E293B"/>
+        <path d="M50 46C34.536 46 22 58.536 22 74C22 77.314 24.686 80 28 80H72C75.314 80 78 77.314 78 74C78 58.536 65.464 46 50 46Z" fill="#3B82F6"/>
+        <path d="M34 26C34 18 42 12 50 12C58 12 66 18 66 26C66 28 64 33 64 33C64 33 58 30 50 30C42 30 36 33 36 33C36 33 34 28 34 26Z" fill="#0F172A"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="customer-info">
+    <div class="customer-name">คุณฟ้า (สายหลุด/ใกล้หมดอายุ)</div>
+    <div class="customer-tag">คาแรคเตอร์: รับฟังด้วยเหตุผล</div>
+  </div>
+
   <div id="status" class="status-box">สถานะ: พร้อมเชื่อมต่อ</div>
 
   <button id="startBtn" class="btn">เริ่มการสนทนา (Start Call)</button>
   <button id="stopBtn" class="btn btn-stop" style="display: none;">จบการสนทนา (End Call)</button>
+
+  <!-- QC Evaluation Card -->
+  <div id="evalCard" class="eval-card">
+    <div class="eval-header">
+      <h3 style="margin:0; font-size:16px; color:#1e293b;">ผลการประเมิน QC</h3>
+      <div id="scoreBadge" class="score-badge">0/100</div>
+    </div>
+    
+    <div class="eval-section">
+      <div class="eval-title text-green">💪 จุดแข็ง (Strengths)</div>
+      <ul id="strengthsList" class="eval-list"></ul>
+    </div>
+
+    <div class="eval-section">
+      <div class="eval-title text-amber">📌 จุดที่ต้องพัฒนา (Improvements)</div>
+      <ul id="improvementsList" class="eval-list"></ul>
+    </div>
+
+    <div class="eval-section">
+      <div class="eval-title text-red">🚨 ข้อห้ามวิกฤต (Fatal Mistakes)</div>
+      <div id="fatalBox" class="fatal-box">ไม่พบข้อผิดพลาดร้ายแรง</div>
+    </div>
+  </div>
+
+  <button id="downloadBtn" class="btn btn-download">ดาวน์โหลดรายงานประเมิน (QC Report)</button>
 
   <div id="log" class="log-box">-- บันทึกการทำงานระบบ (Debug Log) --</div>
 </div>
@@ -85,8 +218,11 @@
 <script>
   const startBtn = document.getElementById('startBtn');
   const stopBtn = document.getElementById('stopBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
   const statusDiv = document.getElementById('status');
   const logDiv = document.getElementById('log');
+  const evalCard = document.getElementById('evalCard');
+  const avatarRing = document.getElementById('avatarRing');
 
   let ws = null;
   let audioCtx = null;
@@ -94,6 +230,10 @@
   let processor = null;
   let inputAudioCtx = null;
   let nextStartTime = 0;
+  let apiKey = null;
+
+  let conversationTranscript = [];
+  let currentEvaluationData = null;
 
   function log(msg) {
     console.log(msg);
@@ -104,6 +244,14 @@
   function updateStatus(text, type = '') {
     statusDiv.innerText = `สถานะ: ${text}`;
     statusDiv.className = `status-box ${type}`;
+  }
+
+  function setAvatarSpeaking(isSpeaking) {
+    if (isSpeaking) {
+      avatarRing.classList.add('speaking');
+    } else {
+      avatarRing.classList.remove('speaking');
+    }
   }
 
   function convertFloat32ToInt16Base64(buffer) {
@@ -124,12 +272,11 @@
 
   async function playAudioChunk(base64Pcm) {
     if (!audioCtx) return;
-    
-    if (audioCtx.state === 'suspended') {
-      await audioCtx.resume();
-    }
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
 
     try {
+      setAvatarSpeaking(true); // เปิดเอฟเฟกต์วงแหวนเรืองแสงรอบอวาตาร์
+
       const binaryString = atob(base64Pcm);
       const len = binaryString.length;
       const bytes = new Uint8Array(len);
@@ -155,15 +302,27 @@
 
       source.start(nextStartTime);
       nextStartTime += audioBuffer.duration;
+
+      // ปิดเอฟเฟกต์เมื่อเล่นเสียงท่อนนี้จบ
+      setTimeout(() => {
+        if (audioCtx && audioCtx.currentTime >= nextStartTime - 0.1) {
+          setAvatarSpeaking(false);
+        }
+      }, audioBuffer.duration * 1000);
+
     } catch (e) {
-      log("Error playing audio chunk: " + e.message);
+      log("Error playing audio: " + e.message);
+      setAvatarSpeaking(false);
     }
   }
 
   async function startSession() {
     log("กำลังเริ่มกระบวนการ...");
-    updateStatus("กำลังขอสิทธิ์ไมโครโฟนและดึงข้อมูล...", "");
+    updateStatus("กำลังขอสิทธิ์ไมโครโฟน...", "");
     startBtn.disabled = true;
+    evalCard.style.display = "none";
+    downloadBtn.style.display = "none";
+    conversationTranscript = [];
 
     try {
       micStream = await navigator.mediaDevices.getUserMedia({ 
@@ -175,22 +334,21 @@
       const data = await response.json();
 
       if (!data.key) {
-        log("ERROR: ไม่ได้รับ API Key จาก Vercel");
+        log("ERROR: ไม่ได้รับ API Key");
         updateStatus("ไม่พบ GEMINI_API_KEY", "error");
         startBtn.disabled = false;
-        stopSession();
+        stopSessionResources();
         return;
       }
+      apiKey = data.key;
       log("ได้รับ API Key เรียบร้อยแล้ว");
 
       audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
-      if (audioCtx.state === 'suspended') {
-        await audioCtx.resume();
-      }
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
       nextStartTime = audioCtx.currentTime;
 
-      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${data.key}`;
-      log("กำลังเชื่อมต่อ WebSocket ไปยัง Google API (v1alpha)...");
+      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+      log("กำลังเชื่อมต่อ WebSocket...");
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
@@ -206,13 +364,13 @@
               responseModalities: ["AUDIO"],
               speechConfig: {
                 voiceConfig: {
-                  prebuiltVoiceConfig: { voiceName: "Charon" } // เปลี่ยนเป็นเสียงสุขุม นุ่มลึก
+                  prebuiltVoiceConfig: { voiceName: "Charon" }
                 }
               }
             },
             systemInstruction: {
               parts: [{ 
-                text: "คุณคือลูกค้าชื่อ 'มังกร' (น้ำเสียงสุขุม นุ่มลึก เป็นผู้ใหญ่)\n" +
+                text: "คุณคือลูกค้าชื่อ 'น้องฟ้า' (น้ำเสียงสุขุม นุ่มลึก เป็นผู้ใหญ่)\n" +
                       "กฎสำคัญที่สุดในการพูดคุย:\n" +
                       "1. ตอบกระชับ สั้นๆ ไม่เกิน 1-2 ประโยคต่อรอบเท่านั้น ห้ามพูดรวดเดียวเป็นชุดยาวๆ\n" +
                       "2. เมื่อพูดจบประโยคให้หยุดรอฟังคู่สนทนาทันที ไม่ต้องพูดเกริ่นขยายความต่อ\n" +
@@ -222,23 +380,18 @@
             }
           }
         };
-
-        log("ส่ง Setup Message...");
         ws.send(JSON.stringify(setupMessage));
       };
 
       ws.onmessage = async (event) => {
         try {
           let rawData = event.data;
-          if (rawData instanceof Blob) {
-            rawData = await rawData.text();
-          }
+          if (rawData instanceof Blob) rawData = await rawData.text();
           let resData = JSON.parse(rawData);
 
           if (resData.setupComplete) {
-            log("Setup Complete! เริ่มสตรีมไมค์ (รอน้องฟ้าพูดทักทายสั้นๆ)...");
-            updateStatus("พร้อมสนทนา (พูดเสนอขายได้เลย)", "active");
-            
+            log("Setup Complete! เริ่มสตรีมไมค์...");
+            updateStatus("กำลังสนทนา (พูดเสนอขายได้เลย)", "active");
             startMicStream(micStream);
             return;
           }
@@ -246,6 +399,9 @@
           if (resData.serverContent && resData.serverContent.modelTurn) {
             const parts = resData.serverContent.modelTurn.parts;
             for (const part of parts) {
+              if (part.text) {
+                conversationTranscript.push({ role: "Customer (ฟ้า)", text: part.text });
+              }
               if (part.inlineData && part.inlineData.mimeType && part.inlineData.mimeType.startsWith("audio/pcm")) {
                 await playAudioChunk(part.inlineData.data);
               }
@@ -256,18 +412,21 @@
         }
       };
 
-      ws.onerror = (err) => {
-        log("WebSocket ERROR Event เกิดขึ้น!");
+      ws.onerror = () => {
+        log("WebSocket ERROR!");
         updateStatus("เกิดข้อผิดพลาดในการเชื่อมต่อ", "error");
+        setAvatarSpeaking(false);
       };
 
       ws.onclose = (evt) => {
-        log(`WebSocket ปิดการเชื่อมต่อ! (Code: ${evt.code}, Reason: "${evt.reason}")`);
-        updateStatus("จบการสนทนาเรียบร้อย", "");
+        log(`WebSocket ปิดการเชื่อมต่อ (Code: ${evt.code})`);
+        setAvatarSpeaking(false);
         stopSessionResources();
         startBtn.style.display = "block";
         startBtn.disabled = false;
         stopBtn.style.display = "none";
+        
+        evaluateSession();
       };
 
     } catch (err) {
@@ -291,10 +450,7 @@
 
         const realTimeInput = {
           realtimeInput: {
-            audio: {
-              mimeType: "audio/pcm;rate=16000",
-              data: base64Audio
-            }
+            audio: { mimeType: "audio/pcm;rate=16000", data: base64Audio }
           }
         };
         ws.send(JSON.stringify(realTimeInput));
@@ -302,29 +458,18 @@
 
       source.connect(processor);
       processor.connect(inputAudioCtx.destination);
-      log("ระบบสตรีมไมโครโฟนทำงานแล้ว");
+      log("สตรีมไมโครโฟนทำงานแล้ว");
     } catch (e) {
-      log("Error starting mic stream: " + e.message);
+      log("Error mic stream: " + e.message);
     }
   }
 
   function stopSessionResources() {
-    if (processor) {
-      processor.disconnect();
-      processor = null;
-    }
-    if (inputAudioCtx) {
-      inputAudioCtx.close();
-      inputAudioCtx = null;
-    }
-    if (micStream) {
-      micStream.getTracks().forEach(track => track.stop());
-      micStream = null;
-    }
-    if (audioCtx) {
-      audioCtx.close();
-      audioCtx = null;
-    }
+    setAvatarSpeaking(false);
+    if (processor) { processor.disconnect(); processor = null; }
+    if (inputAudioCtx) { inputAudioCtx.close(); inputAudioCtx = null; }
+    if (micStream) { micStream.getTracks().forEach(track => track.stop()); micStream = null; }
+    if (audioCtx) { audioCtx.close(); audioCtx = null; }
   }
 
   function stopSession() {
@@ -333,7 +478,102 @@
     stopSessionResources();
   }
 
-  startBtn.addEventListener('click', startS'น้องฟ้า'  stopBtn.addEventListener('click', stopSession);
+  async function evaluateSession() {
+    if (!apiKey) return;
+    updateStatus("กำลังวิเคราะห์ผลการประเมิน QC...", "evaluating");
+    log("ส่งบทสนทนาไปวิเคราะห์ QC...");
+
+    const promptText = `
+    คุณคือผู้เชี่ยวชาญด้านการตรวจคุณภาพสาย (QC Auditor) ของบริษัทประกันภัยรถยนต์ 
+    โปรดวิเคราะห์การพูดคุยของพนักงานขาย (Telesales) จากบทสนทนานี้และตอบกลับมาเป็น JSON ตามโครงสร้างนี้เท่านั้น:
+    {
+      "score": 85,
+      "strengths": ["ข้อดี 1", "ข้อดี 2"],
+      "improvements": ["จุดพัฒนา 1", "จุดพัฒนา 2"],
+      "fatalMistakes": ["ข้อห้ามวิกฤตที่พบ เช่น ให้ข้อมูลเท็จ หรือแจ้งไม่มี"]
+    }
+
+    ประวัติบทสนทนาที่ต้องวิเคราะห์:
+    ${JSON.stringify(conversationTranscript, null, 2)}
+    `;
+
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText }] }],
+          generationConfig: { responseMimeType: "application/json" }
+        })
+      });
+
+      const data = await res.json();
+      const evalText = data.candidates[0].content.parts[0].text;
+      currentEvaluationData = JSON.parse(evalText);
+
+      renderEvaluationResult(currentEvaluationData);
+      updateStatus("การประเมิน QC เสร็จสิ้น", "active");
+      log("ประเมินผล QC สำเร็จ");
+    } catch (e) {
+      log("Error Evaluating QC: " + e.message);
+      updateStatus("การวิเคราะห์ QC ขัดข้อง", "error");
+    }
+  }
+
+  function renderEvaluationResult(data) {
+    document.getElementById('scoreBadge').innerText = `${data.score}/100`;
+    
+    const strengthsList = document.getElementById('strengthsList');
+    strengthsList.innerHTML = data.strengths.map(s => `<li>${s}</li>`).join('');
+
+    const improvementsList = document.getElementById('improvementsList');
+    improvementsList.innerHTML = data.improvements.map(i => `<li>${i}</li>`).join('');
+
+    const fatalBox = document.getElementById('fatalBox');
+    if (data.fatalMistakes && data.fatalMistakes.length > 0 && data.fatalMistakes[0] !== "" && data.fatalMistakes[0] !== "ไม่มี") {
+      fatalBox.className = "fatal-box text-red";
+      fatalBox.innerHTML = `⚠️ <b>พบข้อผิดพลาดร้ายแรง:</b><br>${data.fatalMistakes.join('<br>')}`;
+    } else {
+      fatalBox.className = "fatal-box text-green";
+      fatalBox.innerHTML = "✅ ไม่พบข้อห้ามวิกฤตหรือข้อผิดพลาดร้ายแรง";
+    }
+
+    evalCard.style.display = "block";
+    downloadBtn.style.display = "block";
+  }
+
+  downloadBtn.addEventListener('click', () => {
+    if (!currentEvaluationData) return;
+    
+    const reportText = `================================================
+รายงานการประเมินคุณภาพสาย (Telesales QC Report)
+ลูกค้า: คุณฟ้า | วันที่ประเมิน: ${new Date().toLocaleString('th-TH')}
+================================================
+
+คะแนนรวม: ${currentEvaluationData.score} / 100
+
+[จุดแข็ง (Strengths)]
+${currentEvaluationData.strengths.map((s, idx) => `${idx + 1}. ${s}`).join('\n')}
+
+[จุดที่ต้องพัฒนา (Improvements)]
+${currentEvaluationData.improvements.map((i, idx) => `${idx + 1}. ${i}`).join('\n')}
+
+[ข้อห้ามวิกฤต (Fatal Mistakes)]
+${currentEvaluationData.fatalMistakes && currentEvaluationData.fatalMistakes.length > 0 ? currentEvaluationData.fatalMistakes.join('\n') : 'ไม่พบข้อผิดพลาดร้ายแรง'}
+
+================================================
+ส่งออกโดยระบบ Gemini Live Simulator Engine
+================================================`;
+
+    const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `QC_Report_${Date.now()}.txt`;
+    link.click();
+  });
+
+  startBtn.addEventListener('click', startSession);
+  stopBtn.addEventListener('click', stopSession);
 </script>
 
 </body>
