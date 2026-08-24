@@ -449,6 +449,85 @@
               }
             }
           }
+  async function startSession() {
+    log("กำลังเริ่มกระบวนการ...");
+    updateStatus("กำลังขอสิทธิ์ไมโครโฟน...", "");
+    startBtn.disabled = true;
+    evalCard.style.display = "none";
+    downloadBtn.style.display = "none";
+    conversationTranscript = [];
+
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } });
+      const response = await fetch('/api/live');
+      const data = await response.json();
+
+      if (!data.key) {
+        updateStatus("ไม่พบ GEMINI_API_KEY", "error");
+        startBtn.disabled = false;
+        return;
+      }
+      apiKey = data.key;
+
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
+      nextStartTime = audioCtx.currentTime;
+
+      const activePersonaData = personas[currentPersona];
+      
+      // ✅ แก้ไขบรรทัดนี้เรียบร้อยครับ
+      const wsUrl = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=" + apiKey;
+      
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        log(`เชื่อมต่อสำเร็จ คาแรคเตอร์: ${activePersonaData.name}`);
+        updateStatus("เชื่อมต่อสำเร็จ! กำลังส่ง Setup...", "active");
+        startBtn.style.display = "none";
+        stopBtn.style.display = "block";
+
+        const setupMessage = {
+          setup: {
+            model: "models/gemini-2.5-flash",
+            generationConfig: {
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName: activePersonaData.voice }
+                }
+              }
+            },
+            systemInstruction: {
+              parts: [{ text: activePersonaData.instruction }]
+            }
+          }
+        };
+        ws.send(JSON.stringify(setupMessage));
+      };
+
+      ws.onmessage = async (event) => {
+        try {
+          let rawData = event.data;
+          if (rawData instanceof Blob) rawData = await rawData.text();
+          let resData = JSON.parse(rawData);
+
+          if (resData.setupComplete) {
+            updateStatus("กำลังสนทนา (พูดเสนอขายได้เลย)", "active");
+            startMicStream(micStream);
+            return;
+          }
+
+          if (resData.serverContent && resData.serverContent.modelTurn) {
+            const parts = resData.serverContent.modelTurn.parts;
+            for (const part of parts) {
+              if (part.text) {
+                conversationTranscript.push({ role: `Customer (${currentPersona})`, text: part.text });
+              }
+              if (part.inlineData && part.inlineData.mimeType && part.inlineData.mimeType.startsWith("audio/pcm")) {
+                await playAudioChunk(part.inlineData.data);
+              }
+            }
+          }
         } catch (err) {
           log("Parse Error: " + err.message);
         }
