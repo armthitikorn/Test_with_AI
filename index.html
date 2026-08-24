@@ -72,7 +72,7 @@
 
 <div class="card">
   <h2>Gemini Live Audio PoC</h2>
-  <p>ระบบทดสอบเสียงโต้ตอบเรียลไทม์สองทาง (Debug Mode)</p>
+  <p>ระบบทดสอบเสียงโต้ตอบเรียลไทม์สองทาง (Gemini 3.1)</p>
   
   <div id="status" class="status-box">สถานะ: พร้อมเชื่อมต่อ</div>
 
@@ -201,7 +201,6 @@
 
         const setupMessage = {
           setup: {
-            // ใช้โมเดล Gemini 3.1 Live Preview ตามที่คุณอาร์มระบุ
             model: "models/gemini-3.1-flash-live-preview",
             generationConfig: {
               responseModalities: ["AUDIO"],
@@ -296,12 +295,13 @@
         const inputData = e.inputBuffer.getChannelData(0);
         const base64Audio = convertFloat32ToInt16Base64(inputData);
 
+        // [จุดที่แก้ไข] เปลี่ยนจาก mediaChunks เป็นฟิลด์ audio ตามที่ Gemini 3.1 บังคับใช้
         const realTimeInput = {
           realtimeInput: {
-            mediaChunks: [{
+            audio: {
               mimeType: "audio/pcm;rate=16000",
               data: base64Audio
-            }]
+            }
           }
         };
         ws.send(JSON.stringify(realTimeInput));
@@ -309,7 +309,7 @@
 
       source.connect(processor);
       processor.connect(inputAudioCtx.destination);
-      log("ระบบสตรีมไมโครโฟนทำงานแล้ว");
+      log("ระบบสตรีมไมโครโฟนทำงานแล้ว (Gemini 3.1 Format)");
     } catch (e) {
       log("Error starting mic stream: " + e.message);
     }
