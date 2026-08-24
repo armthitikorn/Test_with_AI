@@ -72,7 +72,7 @@
 
 <div class="card">
   <h2>Gemini Live Audio PoC</h2>
-  <p>ระบบจำลองการขายประกันรถยนต์ (Rational Customer)</p>
+  <p>ระบบจำลองการขายประกันรถยนต์ (Short & Rational Response)</p>
   
   <div id="status" class="status-box">สถานะ: พร้อมเชื่อมต่อ</div>
 
@@ -200,28 +200,29 @@
         stopBtn.style.display = "block";
 
         const setupMessage = {
-  setup: {
-    model: "models/gemini-3.1-flash-live-preview",
-    generationConfig: {
-      responseModalities: ["AUDIO"],
-      speechConfig: {
-        voiceConfig: {
-          prebuiltVoiceConfig: { voiceName: "Charon" }
-        }
-      }
-    },
-    systemInstruction: {
-      parts: [{ 
-        text: "คุณคือลูกค้าชื่อ 'น้องฟ้า' (น้ำเสียงสุขุม นุ่มลึก เป็นผู้ใหญ่)\n" +
-              "กฎสำคัญที่สุดในการพูดคุย:\n" +
-              "1. ตอบกระชับ สั้นๆ ไม่เกิน 1-2 ประโยคต่อรอบเท่านั้น ห้ามพูดรวดเดียวเป็นชุดยาวๆ\n" +
-              "2. เมื่อพูดจบประโยคให้หยุดรอฟังคู่สนทนาทันที ไม่ต้องพูดเกริ่นขยายความต่อ\n" +
-              "3. เมื่อเริ่มสาย ให้พูดทักทายสั้นๆ แค่ 'ฮัลโหล สวัสดีค่ะ จากไหนเหรอคะ' แล้วหยุดฟัง\n" +
-              "4. คาแรคเตอร์เป็นคนใช้เหตุผล ไม่กวน แต่ถ้าผู้ขายเสนอเหตุผลและประโยชน์ที่ดี คุณถึงจะค่อยๆ เปิดใจรับฟัง" 
-      }]
-    }
-  }
-};
+          setup: {
+            model: "models/gemini-3.1-flash-live-preview",
+            generationConfig: {
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName: "Charon" } // เปลี่ยนเป็นเสียงสุขุม นุ่มลึก
+                }
+              }
+            },
+            systemInstruction: {
+              parts: [{ 
+                text: "คุณคือลูกค้าชื่อ 'มังกร' (น้ำเสียงสุขุม นุ่มลึก เป็นผู้ใหญ่)\n" +
+                      "กฎสำคัญที่สุดในการพูดคุย:\n" +
+                      "1. ตอบกระชับ สั้นๆ ไม่เกิน 1-2 ประโยคต่อรอบเท่านั้น ห้ามพูดรวดเดียวเป็นชุดยาวๆ\n" +
+                      "2. เมื่อพูดจบประโยคให้หยุดรอฟังคู่สนทนาทันที ไม่ต้องพูดเกริ่นขยายความต่อ\n" +
+                      "3. เมื่อเริ่มสาย ให้พูดทักทายสั้นๆ แค่ 'ฮัลโหล สวัสดีค่ะ จากไหนเหรอคะ' แล้วหยุดฟัง\n" +
+                      "4. คาแรคเตอร์เป็นคนใช้เหตุผล ไม่กวน แต่ถ้าผู้ขายเสนอเหตุผลและประโยชน์ที่ดี คุณถึงจะค่อยๆ เปิดใจรับฟัง" 
+              }]
+            }
+          }
+        };
+
         log("ส่ง Setup Message...");
         ws.send(JSON.stringify(setupMessage));
       };
@@ -235,10 +236,9 @@
           let resData = JSON.parse(rawData);
 
           if (resData.setupComplete) {
-            log("Setup Complete! รอรับฟังเสียงทักทายจากลูกค้า...");
+            log("Setup Complete! เริ่มสตรีมไมค์ (รอน้องฟ้าพูดทักทายสั้นๆ)...");
             updateStatus("พร้อมสนทนา (พูดเสนอขายได้เลย)", "active");
             
-            // เปิดสตรีมไมค์ทันที เพื่อให้เราพูดเสนอขายหลังจากลูกค้าทักทายจบ
             startMicStream(micStream);
             return;
           }
@@ -302,7 +302,7 @@
 
       source.connect(processor);
       processor.connect(inputAudioCtx.destination);
-      log("ระบบสตรีมไมโครโฟนทำงานแล้ว (พร้อมขายประกัน)");
+      log("ระบบสตรีมไมโครโฟนทำงานแล้ว");
     } catch (e) {
       log("Error starting mic stream: " + e.message);
     }
@@ -333,8 +333,7 @@
     stopSessionResources();
   }
 
-  startBtn.addEventListener('click', startSession);
-  stopBtn.addEventListener('click', stopSession);
+  startBtn.addEventListener('click', startS'น้องฟ้า'  stopBtn.addEventListener('click', stopSession);
 </script>
 
 </body>
