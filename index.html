@@ -91,6 +91,7 @@
     } catch (e) { log("Audio Play Error: " + e.message); }
   }
 
+  // เรียกใช้ Gemini 3.1 Flash ในการวิเคราะห์ QC หลังวางสาย
   async function runNongFahQC(key) {
     try {
       const promptText = `
@@ -103,7 +104,8 @@
         "improvements": ["ควรสอบถามข้อยกเว้นเรื่องโรคเรื้อรังเพิ่ม"]
       }`;
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+      // ✅ ใช้ Gemini 3.1 Flash ในการประเมิน QC
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key=${key}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -140,10 +142,10 @@
         startBtn.style.display = "none";
         stopBtn.style.display = "block";
 
-        // ส่ง Setup Payload ที่ถูกต้องตาม Spec ของ Gemini Live
+        // ✅ ใช้โมเดลสำหรับ Live Audio WebSocket
         const setupPayload = {
           setup: {
-            model: "models/gemini-2.5-flash",
+            model: "models/gemini-2.0-flash-exp",
             generationConfig: {
               responseModalities: ["AUDIO"]
             },
@@ -163,7 +165,6 @@
       ws.onmessage = async (event) => {
         const resData = JSON.parse(event.data);
 
-        // รอจนกว่า Server จะแจ้ง Setup Complete ถึงเริ่มส่งเสียงจากไมค์
         if (resData.setupComplete) {
           updateStatus("อยู่ในสายกับคุณมังกร...", "active");
           log("คุณมังกรพร้อมคุยแล้ว");
