@@ -72,7 +72,7 @@
 
 <div class="card">
   <h2>Gemini Live Audio PoC</h2>
-  <p>ระบบทดสอบเสียงโต้ตอบเรียลไทม์ (Debug Mode)</p>
+  <p>ระบบทดสอบเสียงโต้ตอบเรียลไทม์สองทาง (Debug Mode)</p>
   
   <div id="status" class="status-box">สถานะ: พร้อมเชื่อมต่อ</div>
 
@@ -90,6 +90,9 @@
 
   let ws = null;
   let audioCtx = null;
+  let micStream = null;
+  let processor = null;
+  let inputAudioCtx = null;
   let nextStartTime = 0;
 
   function log(msg) {
@@ -101,6 +104,22 @@
   function updateStatus(text, type = '') {
     statusDiv.innerText = `สถานะ: ${text}`;
     statusDiv.className = `status-box ${type}`;
+  }
+
+  function convertFloat32ToInt16Base64(buffer) {
+    let l = buffer.length;
+    let buf = new Int16Array(l);
+    for (let i = 0; i < l; i++) {
+      let s = Math.max(-1, Math.min(1, buffer[i]));
+      buf[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    let binary = '';
+    let bytes = new Uint8Array(buf.buffer);
+    let len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
   }
 
   async function playAudioChunk(base64Pcm) {
@@ -143,10 +162,15 @@
 
   async function startSession() {
     log("กำลังเริ่มกระบวนการ...");
-    updateStatus("กำลังดึงข้อมูลการเชื่อมต่อ...", "");
+    updateStatus("กำลังขอสิทธิ์ไมโครโฟนและดึงข้อมูล...", "");
     startBtn.disabled = true;
 
     try {
+      micStream = await navigator.mediaDevices.getUserMedia({ 
+        audio: { channelCount: 1, sampleRate: 16000 } 
+      });
+      log("เปิดใช้งานไมโครโฟนสำเร็จ");
+
       const response = await fetch('/api/live');
       const data = await response.json();
 
@@ -154,6 +178,7 @@
         log("ERROR: ไม่ได้รับ API Key จาก Vercel");
         updateStatus("ไม่พบ GEMINI_API_KEY", "error");
         startBtn.disabled = false;
+        stopSession();
         return;
       }
       log("ได้รับ API Key เรียบร้อยแล้ว");
@@ -176,6 +201,7 @@
 
         const setupMessage = {
           setup: {
+            // ใช้โมเดล Gemini 3.1 Live Preview ตามที่คุณอาร์มระบุ
             model: "models/gemini-3.1-flash-live-preview",
             generationConfig: {
               responseModalities: ["AUDIO"],
@@ -206,10 +232,11 @@
           let resData = JSON.parse(rawData);
 
           if (resData.setupComplete) {
-            log("Setup Complete! ส่งคำทักทายเปิดสาย...");
-            updateStatus("กำลังสนทนากับน้องฟ้า...", "active");
+            log("Setup Complete! เริ่มสตรีมเสียงไมโครโฟนและส่งคำทักทาย...");
+            updateStatus("กำลังสนทนากับน้องฟ้า (พูดคุยได้เลย)", "active");
             
-            // ส่งข้อความกระตุ้นให้ AI (น้องฟ้า) เริ่มพูดทักทายกลับมาทันที
+            startMicStream(micStream);
+
             const initialTurn = {
               clientContent: {
                 turns: [{
@@ -227,7 +254,6 @@
             const parts = resData.serverContent.modelTurn.parts;
             for (const part of parts) {
               if (part.inlineData && part.inlineData.mimeType && part.inlineData.mimeType.startsWith("audio/pcm")) {
-                log("กำลังประมวลผลสตรีมเสียง PCM...");
                 await playAudioChunk(part.inlineData.data);
               }
             }
@@ -245,22 +271,73 @@
       ws.onclose = (evt) => {
         log(`WebSocket ปิดการเชื่อมต่อ! (Code: ${evt.code}, Reason: "${evt.reason}")`);
         updateStatus("จบการสนทนาเรียบร้อย", "");
+        stopSessionResources();
         startBtn.style.display = "block";
         startBtn.disabled = false;
         stopBtn.style.display = "none";
       };
 
     } catch (err) {
-      log("Fetch Error: " + err.message);
-      updateStatus("ดึง Key ไม่สำเร็จ", "error");
+      log("Fetch/Mic Error: " + err.message);
+      updateStatus("เปิดไมค์หรือดึง Key ไม่สำเร็จ", "error");
       startBtn.disabled = false;
+      stopSessionResources();
+    }
+  }
+
+  function startMicStream(stream) {
+    try {
+      inputAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      const source = inputAudioCtx.createMediaStreamSource(stream);
+      
+      processor = inputAudioCtx.createScriptProcessor(4096, 1, 1);
+      processor.onaudioprocess = (e) => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        const inputData = e.inputBuffer.getChannelData(0);
+        const base64Audio = convertFloat32ToInt16Base64(inputData);
+
+        const realTimeInput = {
+          realtimeInput: {
+            mediaChunks: [{
+              mimeType: "audio/pcm;rate=16000",
+              data: base64Audio
+            }]
+          }
+        };
+        ws.send(JSON.stringify(realTimeInput));
+      };
+
+      source.connect(processor);
+      processor.connect(inputAudioCtx.destination);
+      log("ระบบสตรีมไมโครโฟนทำงานแล้ว");
+    } catch (e) {
+      log("Error starting mic stream: " + e.message);
+    }
+  }
+
+  function stopSessionResources() {
+    if (processor) {
+      processor.disconnect();
+      processor = null;
+    }
+    if (inputAudioCtx) {
+      inputAudioCtx.close();
+      inputAudioCtx = null;
+    }
+    if (micStream) {
+      micStream.getTracks().forEach(track => track.stop());
+      micStream = null;
+    }
+    if (audioCtx) {
+      audioCtx.close();
+      audioCtx = null;
     }
   }
 
   function stopSession() {
     log("กดปุ่มจบการสนทนา");
     if (ws) ws.close();
-    if (audioCtx) audioCtx.close();
+    stopSessionResources();
   }
 
   startBtn.addEventListener('click', startSession);
