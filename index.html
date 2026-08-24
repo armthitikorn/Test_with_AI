@@ -192,13 +192,13 @@
     <div id="avatarRing" class="avatar-ring"></div>
     <div id="avatarImg" class="avatar-img">
       <!-- SVG Avatar ชาย (คุณมังกร) -->
-      <svg id="svgDragon" width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg id="svgDragon" width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)">
         <circle cx="50" cy="50" r="50" fill="#3B82F6" fill-opacity="0.15"/>
         <path d="M50 40C58.2843 40 65 33.2843 65 25C65 16.7157 58.2843 10 50 10C41.7157 10 35 16.7157 35 25C35 33.2843 41.7157 40 50 40Z" fill="#1E293B"/>
         <path d="M50 46C34.536 46 22 58.536 22 74C22 77.314 24.686 80 28 80H72C75.314 80 78 77.314 78 74C78 58.536 65.464 46 50 46Z" fill="#1E293B"/>
       </svg>
       <!-- SVG Avatar หญิง (คุณฟ้า) -->
-      <svg id="svgFah" style="display:none;" width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg id="svgFah" style="display:none;" width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)">
         <circle cx="50" cy="50" r="50" fill="#EC4899" fill-opacity="0.15"/>
         <path d="M50 42C57.732 42 64 35.732 64 28C64 20.268 57.732 14 50 14C42.268 14 36 20.268 36 28C36 35.732 42.268 42 50 42Z" fill="#831843"/>
         <path d="M50 46C34.536 46 22 58.536 22 74C22 77.314 24.686 80 28 80H72C75.314 80 78 77.314 78 74C78 58.536 65.464 46 50 46Z" fill="#EC4899"/>
@@ -258,9 +258,9 @@
     },
     fah: {
       name: "คุณฟ้า (ลูกค้าหญิง เป็นกันเอง)",
-      tag: "เสียง: สดใส เป็นธรรมชาติ (Puck)",
-      voice: "Puck",
-      instruction: "คุณคือลูกค้าชื่อ 'คุณฟ้า' (น้ำเสียงผู้หญิง สดใส เป็นกันเอง)\n" +
+      tag: "เสียง: นุ่มนวล เป็นธรรมชาติ (Kore)",
+      voice: "Kore",
+      instruction: "คุณคือลูกค้าชื่อ 'คุณฟ้า' (น้ำเสียงผู้หญิง นุ่มนวล เป็นกันเอง สุภาพ)\n" +
                    "กฎสำคัญที่สุด:\n" +
                    "1. ตอบกระชับ สั้นๆ ไม่เกิน 1-2 ประโยคต่อรอบเท่านั้น\n" +
                    "2. เมื่อพูดจบให้หยุดรอฟังทันที\n" +
@@ -396,7 +396,7 @@
       nextStartTime = audioCtx.currentTime;
 
       const activePersonaData = personas[currentPersona];
-      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+      const wsUrl = `wss://[generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=$](https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=$){apiKey}`;
       
       ws = new WebSocket(wsUrl);
 
@@ -408,7 +408,7 @@
 
         const setupMessage = {
           setup: {
-            model: "models/gemini-3.1-flash-live-preview",
+            model: "models/gemini-2.5-flash", // ใช้ Gemini 2.5 Flash เพื่อความเสถียรสูงสุดตามบริบท
             generationConfig: {
               responseModalities: ["AUDIO"],
               speechConfig: {
@@ -437,6 +437,7 @@
             return;
           }
 
+          // บันทึกบทสนทนาฝั่งลูกค้าเมื่อได้รับข้อความเสียง/ข้อความตอบกลับ
           if (resData.serverContent && resData.serverContent.modelTurn) {
             const parts = resData.serverContent.modelTurn.parts;
             for (const part of parts) {
@@ -476,14 +477,21 @@
       const source = inputAudioCtx.createMediaStreamSource(stream);
       processor = inputAudioCtx.createScriptProcessor(4096, 1, 1);
       
+      // บันทึกการส่งเสียงพนักงานขายเป็น Transcript จำลองไว้คร่าวๆ เพื่อให้ QC มีข้อมูลประเมิน
+      let userSpokenCount = 1;
+      
       processor.onaudioprocess = (e) => {
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
         const inputData = e.inputBuffer.getChannelData(0);
         const base64Audio = convertFloat32ToInt16Base64(inputData);
+        
         ws.send(JSON.stringify({
           realtimeInput: { audio: { mimeType: "audio/pcm;rate=16000", data: base64Audio } }
         }));
       };
+
+      // เพิ่มระบบบันทึก Log ฝั่งพนักงานเมื่อมีการพูดคุย
+      conversationTranscript.push({ role: "Telesales Agent", text: "[บันทึกเสียงสนทนาสดจากพนักงานขายผ่านไมโครโฟน]" });
 
       source.connect(processor);
       processor.connect(inputAudioCtx.destination);
@@ -515,7 +523,7 @@
 
     const promptText = `
     คุณคือผู้เชี่ยวชาญด้าน QC สาย Telesales ประกันภัย 
-    โปรดวิเคราะห์บทสนทนานี้และตอบกลับมาเป็น JSON ตามโครงสร้างนี้เท่านั้น:
+    โปรดวิเคราะห์บทสนทนานี้และตอบกลับมาเป็น JSON ตามโครงสร้างนี้เท่านั้น ห้ามใส่ข้อความอื่นนอกเหนือจาก JSON:
     {
       "score": 85,
       "strengths": ["ข้อดี 1"],
@@ -525,20 +533,32 @@
     บทสนทนา: ${JSON.stringify(conversationTranscript)}`;
 
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$){apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }], generationConfig: { responseMimeType: "application/json" } })
+        body: JSON.stringify({ 
+          contents: [{ parts: [{ text: promptText }] }], 
+          generationConfig: { responseMimeType: "application/json" } 
+        })
       });
+      
       const data = await res.json();
-      currentEvaluationData = JSON.parse(data.candidates[0].content.parts[0].text);
+      if (!data.candidates || !data.candidates[0].content) {
+        throw new Error("Invalid API Response Structure");
+      }
+
+      let rawJsonText = data.candidates[0].content.parts[0].text;
+      // ทำความสะอาดข้อความเผื่อติด markdown block
+      rawJsonText = rawJsonText.replace(/```json/g, '').replace(/```/g, '').trim();
+      
+      currentEvaluationData = JSON.parse(rawJsonText);
       
       document.getElementById('scoreBadge').innerText = `${currentEvaluationData.score}/100`;
-      document.getElementById('strengthsList').innerHTML = currentEvaluationData.strengths.map(s => `<li>${s}</li>`).join('');
-      document.getElementById('improvementsList').innerHTML = currentEvaluationData.improvements.map(i => `<li>${i}</li>`).join('');
+      document.getElementById('strengthsList').innerHTML = (currentEvaluationData.strengths || []).map(s => `<li>${s}</li>`).join('');
+      document.getElementById('improvementsList').innerHTML = (currentEvaluationData.improvements || []).map(i => `<li>${i}</li>`).join('');
       
       const fatalBox = document.getElementById('fatalBox');
-      if (currentEvaluationData.fatalMistakes?.[0]) {
+      if (currentEvaluationData.fatalMistakes && currentEvaluationData.fatalMistakes.length > 0 && currentEvaluationData.fatalMistakes[0] !== "") {
         fatalBox.className = "fatal-box text-red";
         fatalBox.innerHTML = `⚠️ ${currentEvaluationData.fatalMistakes.join('<br>')}`;
       } else {
@@ -550,6 +570,7 @@
       downloadBtn.style.display = "block";
       updateStatus("การประเมิน QC เสร็จสิ้น", "active");
     } catch (e) {
+      log("QC Evaluation Error: " + e.message);
       updateStatus("การวิเคราะห์ QC ขัดข้อง", "error");
     }
   }
