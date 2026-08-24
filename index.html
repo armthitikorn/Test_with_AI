@@ -105,13 +105,21 @@
 
   async function playAudioChunk(base64Pcm) {
     if (!audioCtx) return;
+    
+    if (audioCtx.state === 'suspended') {
+      await audioCtx.resume();
+    }
+
     try {
       const binaryString = atob(base64Pcm);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
-      const int16Array = new Int16Array(bytes.buffer);
+
+      // Safe Uint8Array to Int16Array conversion using byteOffset and exact length
+      const int16Array = new Int16Array(bytes.buffer, bytes.byteOffset, len / 2);
       const float32Array = new Float32Array(int16Array.length);
       for (let i = 0; i < int16Array.length; i++) {
         float32Array[i] = int16Array[i] / 32768.0;
@@ -157,7 +165,6 @@
       }
       nextStartTime = audioCtx.currentTime;
 
-      // Endpoint สำหรับ Bidi Streaming Live API
       const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${data.key}`;
       log("กำลังเชื่อมต่อ WebSocket ไปยัง Google API (v1alpha)...");
       ws = new WebSocket(wsUrl);
@@ -170,7 +177,7 @@
 
         const setupMessage = {
           setup: {
-            model: "models/gemini-2.5-flash",
+            model: "models/gemini-2.0-flash-exp",
             generationConfig: {
               responseModalities: ["AUDIO"],
               speechConfig: {
@@ -193,9 +200,14 @@
 
       ws.onmessage = async (event) => {
         try {
-          let resData = JSON.parse(event.data);
+          let resData;
+          if (event.data instanceof Blob) {
+            const text = await event.data.text();
+            resData = JSON.parse(text);
+          } else {
+            resData = JSON.parse(event.data);
+          }
 
-          // เมื่อ Server ตอบกลับว่า Setup สำเร็จ
           if (resData.setupComplete) {
             log("Setup Complete! ส่งคำทักทายเปิดสาย...");
             updateStatus("พร้อมสนทนา (กำลังพูดคุย)", "active");
@@ -213,7 +225,6 @@
             return;
           }
 
-          // เมื่อได้รับสตรีมเสียงจาก Gemini
           if (resData.serverContent && resData.serverContent.modelTurn) {
             const parts = resData.serverContent.modelTurn.parts;
             for (const part of parts) {
