@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gemini Live Audio Simulator - PoC Test</title>
+  <title>Gemini Live Audio Simulator - Sales PoC</title>
   <style>
     * { box-sizing: border-box; }
     body { 
@@ -72,7 +72,7 @@
 
 <div class="card">
   <h2>Gemini Live Audio PoC</h2>
-  <p>ระบบทดสอบเสียงโต้ตอบเรียลไทม์สองทาง (Gemini 3.1)</p>
+  <p>ระบบจำลองการขายประกันรถยนต์ (Rational Customer)</p>
   
   <div id="status" class="status-box">สถานะ: พร้อมเชื่อมต่อ</div>
 
@@ -200,24 +200,28 @@
         stopBtn.style.display = "block";
 
         const setupMessage = {
-          setup: {
-            model: "models/gemini-3.1-flash-live-preview",
-            generationConfig: {
-              responseModalities: ["AUDIO"],
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: { voiceName: "Puck" }
-                }
-              }
-            },
-            systemInstruction: {
-              parts: [{ 
-                text: "คุณคือลูกค้าชื่อ 'น้องฟ้า' ที่กำลังโทรเข้ามาสอบถามประกันภัยรถยนต์ ให้พูดโต้ตอบด้วยน้ำเสียงธรรมชาติมากๆ เหมือนมนุษย์จริง มีจังหวะถอนหายใจ เว้นช่วงคิด พูด 'เอ่อ' หรือ 'อ่า' ได้ตามธรรมชาติ ไม่ต้องพูดจาเป็นทางการเหมือนหุ่นยนต์" 
-              }]
-            }
-          }
-        };
-
+  setup: {
+    model: "models/gemini-3.1-flash-live-preview",
+    generationConfig: {
+      responseModalities: ["AUDIO"],
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: { voiceName: "Charon" }
+        }
+      }
+    },
+    systemInstruction: {
+      parts: [{ 
+        text: "คุณคือลูกค้าชื่อ 'น้องฟ้า' (น้ำเสียงสุขุม นุ่มลึก เป็นผู้ใหญ่)\n" +
+              "กฎสำคัญที่สุดในการพูดคุย:\n" +
+              "1. ตอบกระชับ สั้นๆ ไม่เกิน 1-2 ประโยคต่อรอบเท่านั้น ห้ามพูดรวดเดียวเป็นชุดยาวๆ\n" +
+              "2. เมื่อพูดจบประโยคให้หยุดรอฟังคู่สนทนาทันที ไม่ต้องพูดเกริ่นขยายความต่อ\n" +
+              "3. เมื่อเริ่มสาย ให้พูดทักทายสั้นๆ แค่ 'ฮัลโหล สวัสดีค่ะ จากไหนเหรอคะ' แล้วหยุดฟัง\n" +
+              "4. คาแรคเตอร์เป็นคนใช้เหตุผล ไม่กวน แต่ถ้าผู้ขายเสนอเหตุผลและประโยชน์ที่ดี คุณถึงจะค่อยๆ เปิดใจรับฟัง" 
+      }]
+    }
+  }
+};
         log("ส่ง Setup Message...");
         ws.send(JSON.stringify(setupMessage));
       };
@@ -231,21 +235,11 @@
           let resData = JSON.parse(rawData);
 
           if (resData.setupComplete) {
-            log("Setup Complete! เริ่มสตรีมเสียงไมโครโฟนและส่งคำทักทาย...");
-            updateStatus("กำลังสนทนากับน้องฟ้า (พูดคุยได้เลย)", "active");
+            log("Setup Complete! รอรับฟังเสียงทักทายจากลูกค้า...");
+            updateStatus("พร้อมสนทนา (พูดเสนอขายได้เลย)", "active");
             
+            // เปิดสตรีมไมค์ทันที เพื่อให้เราพูดเสนอขายหลังจากลูกค้าทักทายจบ
             startMicStream(micStream);
-
-            const initialTurn = {
-              clientContent: {
-                turns: [{
-                  role: "user",
-                  parts: [{ text: "สวัสดีครับน้องฟ้า ติดต่อสอบถามเรื่องประกันภัยรถยนต์ใช่ไหมครับ" }]
-                }],
-                turnComplete: true
-              }
-            };
-            ws.send(JSON.stringify(initialTurn));
             return;
           }
 
@@ -295,7 +289,6 @@
         const inputData = e.inputBuffer.getChannelData(0);
         const base64Audio = convertFloat32ToInt16Base64(inputData);
 
-        // [จุดที่แก้ไข] เปลี่ยนจาก mediaChunks เป็นฟิลด์ audio ตามที่ Gemini 3.1 บังคับใช้
         const realTimeInput = {
           realtimeInput: {
             audio: {
@@ -309,7 +302,7 @@
 
       source.connect(processor);
       processor.connect(inputAudioCtx.destination);
-      log("ระบบสตรีมไมโครโฟนทำงานแล้ว (Gemini 3.1 Format)");
+      log("ระบบสตรีมไมโครโฟนทำงานแล้ว (พร้อมขายประกัน)");
     } catch (e) {
       log("Error starting mic stream: " + e.message);
     }
