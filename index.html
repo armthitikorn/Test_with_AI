@@ -588,15 +588,15 @@
       "fatalMistakes": ["ข้อผิดพลาดร้ายแรง/คำต้องห้าม (ถ้าไม่มีให้ใส่อาร์เรย์ว่าง)"]
     }`;
 
-    try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-live-preview:generateContent?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          contents: [{ parts: [{ text: promptText }] }], 
-          generationConfig: { responseMimeType: "application/json" } 
-        })
-      });
+// แก้ไขในฟังก์ชัน evaluateSession()
+const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key=${apiKey}`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ 
+    contents: [{ parts: [{ text: promptText }] }], 
+    generationConfig: { responseMimeType: "application/json" } 
+  })
+});
 
       if (!res.ok) {
         const errJson = await res.json();
