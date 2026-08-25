@@ -129,21 +129,6 @@
     .btn:disabled { background: #cbd5e1; cursor: not-allowed; }
     .btn-stop { background: #ef4444; }
     .btn-download { background: #059669; margin-top: 12px; display: none; }
-    
-    .log-box {
-      margin-top: 20px;
-      padding: 10px;
-      background: #0f172a;
-      color: #38bdf8;
-      font-family: monospace;
-      font-size: 11px;
-      text-align: left;
-      border-radius: 8px;
-      max-height: 120px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      word-break: break-all;
-    }
 
     .eval-card {
       display: none;
@@ -230,7 +215,6 @@
 
   <button id="downloadBtn" class="btn btn-download">ดาวน์โหลดรายงานประเมิน (QC Report)</button>
 
-  <div id="log" class="log-box">-- บันทึกการทำงานระบบ (Debug Log) --</div>
 </div>
 
 <script>
@@ -241,21 +225,25 @@
       name: "คุณมังกร (ลูกค้าชาย สายเหตุผล)",
       tag: "เสียง: สุขุม นุ่มลึก (Charon)",
       voice: "Charon",
-      instruction: "คุณคือลูกค้าชื่อ 'คุณมังกร' (ผู้ชายสุขุม เป็นผู้ใหญ่)\n" +
+      instruction: "คุณคือลูกค้าชื่อ 'คุณมังกร' (ผู้ชายวัยทำงาน เสียงสุขุม มีเหตุผล)\n" +
                    "กฎการสนทนา:\n" +
-                   "1. ตอบสั้นกระชับ ไม่เกิน 1-2 ประโยคต่อรอบ\n" +
-                   "2. ทักทายตอนเริ่มสายว่า 'ฮัลโหล สวัสดีครับ จากไหนครับ'\n" +
-                   "3. ซื้อยาก ต้องมีเหตุผลและตัวเลขความคุ้มค่ารองรับเสมอ"
+                   "1. คุณไม่ได้เตรียมตัวรับสายและไม่ทราบว่าใครโทรมา เริ่มสายด้วยความประหลาดใจ เช่น 'ฮัลโหลครับ จากไหนครับ' หรือ 'โทรมาจากไหนนะครับ'\n" +
+                   "2. ห้ามถามหาโปรโมชั่น ส่วนลด หรือของแถมเด็ดขาด\n" +
+                   "3. ตอนแรกคุณไม่ได้อยากทำประกัน (อาจจะบอกว่ายุ่งอยู่ หรือยังไม่สนใจ) แต่ถ้าพนักงานอธิบายเหตุผลและประโยชน์ได้ดี น่าสนใจ คุณจะเปิดโอกาสให้พูดต่อ\n" +
+                   "4. ถ้านำเสนอได้ดีเยี่ยมและตรงใจ คุณจะตกลงทำประกัน (ไม่ว่าจะเป็นประกันชีวิต สะสมทรัพย์ หรือสุขภาพ) และยินดีให้ข้อมูลส่วนตัวต่างๆ เพื่อทำกรมธรรม์\n" +
+                   "5. ตอบสั้นกระชับ เป็นธรรมชาติ ไม่เกิน 1-2 ประโยคต่อรอบ"
     },
     fah: {
       name: "คุณฟ้า (ลูกค้าหญิง เป็นกันเอง)",
       tag: "เสียง: นุ่มนวล เป็นธรรมชาติ (Kore)",
       voice: "Kore",
-      instruction: "คุณคือลูกค้าชื่อ 'คุณฟ้า' (ผู้หญิง นุ่มนวล สุภาพ)\n" +
+      instruction: "คุณคือลูกค้าชื่อ 'คุณฟ้า' (ผู้หญิงวัยทำงาน เสียงนุ่มนวล สุภาพ)\n" +
                    "กฎการสนทนา:\n" +
-                   "1. ตอบสั้นกระชับ ไม่เกิน 1-2 ประโยคต่อรอบ\n" +
-                   "2. ทักทายตอนเริ่มสายว่า 'ฮัลโหล สวัสดีค่ะ จากไหนเหรอคะ'\n" +
-                   "3. สนใจเรื่องสิทธิประโยชน์และส่วนลดโปรโมชั่น"
+                   "1. คุณไม่ได้เตรียมตัวรับสายและไม่ทราบว่าใครโทรมา เริ่มสายด้วยความประหลาดใจ เช่น 'ฮัลโหลค่ะ จากไหนคะ' หรือ 'ติดธุระอยู่นิดหน่อย มีอะไรหรือเปล่าคะ'\n" +
+                   "2. ห้ามถามหาโปรโมชั่น ส่วนลด หรือของแถมเด็ดขาด\n" +
+                   "3. ตอนแรกคุณไม่ได้อยากทำประกัน (อาจจะปฏิเสธแบบสุภาพว่ายังไม่สะดวก) แต่ถ้าพนักงานพูดจาดี มีเหตุผลรองรับที่น่าสนใจ คุณจะเปิดโอกาสให้พูดต่อ\n" +
+                   "4. ถ้านำเสนอได้ดีและเข้าใจง่าย คุณจะตกลงทำประกัน (ไม่ว่าจะเป็นประกันชีวิต สะสมทรัพย์ หรือสุขภาพ) และยินดีให้ข้อมูลส่วนตัวต่างๆ เพื่อทำกรมธรรม์\n" +
+                   "5. ตอบสั้นกระชับ เป็นธรรมชาติ ไม่เกิน 1-2 ประโยคต่อรอบ"
     }
   };
 
@@ -273,7 +261,6 @@
   const stopBtn = document.getElementById('stopBtn');
   const downloadBtn = document.getElementById('downloadBtn');
   const statusDiv = document.getElementById('status');
-  const logDiv = document.getElementById('log');
   const evalCard = document.getElementById('evalCard');
   const avatarRing = document.getElementById('avatarRing');
 
@@ -285,20 +272,18 @@
   let nextStartTime = 0;
   let apiKey = null;
   
-  // ระบบอัดเสียงพนักงาน (MediaRecorder)
   let mediaRecorder = null;
   let audioChunks = [];
   let employeeAudioBase64 = null;
   
   let isCalling = false;
   let speakingTimeout = null;
-  let conversationTranscript = []; // ยังเก็บฝั่ง AI ไว้เพื่อเป็นบริบท
+  let conversationTranscript = []; 
   let currentEvaluationData = null;
 
+  // เปลี่ยนจากแสดงบนหน้าจอ เป็นซ่อนไว้ใน Console
   function log(msg) {
-    console.log(msg);
-    logDiv.innerText += `\n[${new Date().toLocaleTimeString()}] ${msg}`;
-    logDiv.scrollTop = logDiv.scrollHeight;
+    console.log(`[${new Date().toLocaleTimeString()}] ${msg}`);
   }
 
   function updateStatus(text, type = '') {
@@ -326,7 +311,6 @@
     return btoa(binary);
   }
 
-  // Helper Function: แปลง Blob เสียงเป็น Base64
   function blobToBase64(blob) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -405,13 +389,11 @@
       if (audioCtx.state === 'suspended') await audioCtx.resume();
       nextStartTime = audioCtx.currentTime;
 
-      // 🎤 สร้าง MediaRecorder อัดเสียงพนักงานไว้ประเมิน QC
       mediaRecorder = new MediaRecorder(micStream);
       mediaRecorder.ondataavailable = event => {
         if (event.data.size > 0) audioChunks.push(event.data);
       };
       
-      // เมื่อหยุดอัดเสียง ให้รวมไฟล์แล้วเรียก Evaluate
       mediaRecorder.onstop = async () => {
         log("สิ้นสุดการอัดเสียง เตรียมวิเคราะห์ไฟล์...");
         const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
@@ -457,7 +439,7 @@
           if (resData.setupComplete) {
             updateStatus("กำลังสนทนา (พูดเสนอขายได้เลย)", "active");
             startMicStream(micStream);
-            mediaRecorder.start(); // เริ่มอัดเสียงเมื่อตั้งค่าเสร็จ
+            mediaRecorder.start();
             log("เริ่มบันทึกเสียงฝั่งพนักงานแล้ว");
             return;
           }
@@ -521,7 +503,6 @@
     if (speakingTimeout) clearTimeout(speakingTimeout);
     setAvatarSpeaking(false);
     
-    // สั่งให้หยุดอัดเสียง ซึ่งจะไป Trigger Event: onstop ให้ทำงาน evaluateSession ต่อ
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
       mediaRecorder.stop();
     }
@@ -534,17 +515,16 @@
   }
 
   function stopSession() {
-    if (ws) ws.close(); // ปิด Websocket, trigger onclose ซึ่งจะเรียก stopSessionResources
+    if (ws) ws.close();
     else stopSessionResources();
   }
 
-  // 🚀 ส่งทั้งไฟล์เสียง + บทสนทนา AI ไปให้ Gemini 3.6 ประเมิน
   async function evaluateSessionWithAudio() {
     if (!apiKey) return;
     updateStatus("กำลังวิเคราะห์ไฟล์เสียงเพื่อประเมิน QC...", "evaluating");
 
     const promptText = `
-    คุณคือผู้เชี่ยวชาญด้าน QC สาย Telesales ประกันภัยรถยนต์ระดับมืออาชีพ
+    คุณคือผู้เชี่ยวชาญด้าน QC สาย Telesales ประกันภัยระดับมืออาชีพ
     ฉันได้แนบ "ไฟล์เสียงของพนักงานขาย" ที่คุยกับลูกค้า (ลูกค้าชื่อ: ${personas[currentPersona].name})
     และบริบทบทสนทนาฝั่งลูกค้าด้านล่าง เพื่อให้คุณใช้เป็นข้อมูลประกอบ
 
@@ -569,7 +549,6 @@
     }`;
 
     try {
-      // ✅ ใช้ Gemini 3.6 Flash รองรับการอ่านไฟล์เสียง
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -578,7 +557,7 @@
             { 
               parts: [
                 { text: promptText },
-                { inlineData: { mimeType: "audio/webm", data: employeeAudioBase64 } } // แนบไฟล์เสียง!
+                { inlineData: { mimeType: "audio/webm", data: employeeAudioBase64 } }
               ] 
             }
           ], 
