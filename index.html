@@ -257,8 +257,8 @@
       instruction: "คุณคือลูกค้าชื่อ 'คุณฟ้า' (ผู้หญิง นุ่มนวล สุภาพ)\n" +
                    "กฎการสนทนา:\n" +
                    "1. ตอบสั้นกระชับ ไม่เกิน 1-2 ประโยคต่อรอบ\n" +
-                   "2. ทักทายตอนเริ่มสายว่า 'ฮัลโหล สวัสดีค่ะ จากไหนเหรอคะ'\n" +
-                   "3. สนใจเรื่องสิทธิประโยชน์และส่วนลดโปรโมชั่น"
+                   "2. ทักทายตอนเริ่มสายว่า 'ฮัลโหล สวัสดีค่ะ จากไหนเหรอคะ'\n" 
+                   "3. ซื้อยาก ต้องมีเหตุผลคุ้มค่ารองรับเสมอ"
     }
   };
 
@@ -289,11 +289,11 @@
   let apiKey = null;
   let recognition = null;
   
-  // สถานะและตัวแปรจัดการเวลาที่เพิ่มเข้ามาใหม่
   let isCalling = false;
   let speakingTimeout = null;
   let conversationTranscript = [];
   let currentEvaluationData = null;
+  let isRecognizing = false;
 
   function log(msg) {
     console.log(msg);
@@ -332,44 +332,34 @@
     if (!audioCtx) return;
     if (audioCtx.state === 'suspended') await audioCtx.resume();
 
-    try {
-      setAvatarSpeaking(true);
-      if (speakingTimeout) clearTimeout(speakingTimeout); // ยกเลิกการปิดไฟวงแหวนอันเก่าหากเสียงมาต่อเนื่อง
-
-      const binaryString = atob(base64Pcm);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-
-      const int16Array = new Int16Array(bytes.buffer);
-      const float32Array = new Float32Array(int16Array.length);
-      for (let i = 0; i < int16Array.length; i++) float32Array[i] = int16Array[i] / 32768.0;
-
-      const audioBuffer = audioCtx.createBuffer(1, float32Array.length, 24000);
-      audioBuffer.getChannelData(0).set(float32Array);
-
-      const source = audioCtx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioCtx.destination);
-
-      const currentTime = audioCtx.currentTime;
-      if (nextStartTime < currentTime) nextStartTime = currentTime;
-
-      source.start(nextStartTime);
-      nextStartTime += audioBuffer.duration;
-
-      // ปิดไฟวงแหวนเมื่อสิ้นสุดคิวเสียงทั้งหมด
-      const timeRemainingMs = (nextStartTime - audioCtx.currentTime) * 1000;
-      speakingTimeout = setTimeout(() => {
-        setAvatarSpeaking(false);
-      }, Math.max(0, timeRemainingMs));
-
-    } catch (e) {
-      log("Error audio playback: " + e.message);
-      setAvatarSpeaking(false);
+    const binaryString = atob(base64Pcm);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
     }
+    const int16Array = new Int16Array(bytes.buffer);
+    const float32Array = new Float32Array(int16Array.length);
+    for (let i = 0; i < int16Array.length; i++) {
+      float32Array[i] = int16Array[i] / 32768.0;
+    }
+
+    const audioBuffer = audioCtx.createBuffer(1, float32Array.length, 24000);
+    audioBuffer.getChannelData(0).set(float32Array);
+
+    const source = audioCtx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioCtx.destination);
+    
+    setAvatarSpeaking(true);
+    if (speakingTimeout) clearTimeout(speakingTimeout);
+    speakingTimeout = setTimeout(() => setAvatarSpeaking(false), (audioBuffer.duration * 1000) + 200);
+
+    const startTime = Math.max(audioCtx.currentTime, nextStartTime);
+    source.start(startTime);
+    nextStartTime = startTime + audioBuffer.duration;
   }
 
-  // ระบบ Speech-To-Text ฝั่งพนักงาน
+  // ระบบ Speech To Text บันทึกบทพูดของพนักงาน
   function startSpeechToText() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -382,145 +372,150 @@
     recognition.continuous = true;
     recognition.interimResults = false;
 
+    recognition.onstart = () => { isRecognizing = true; };
+    
     recognition.onresult = (event) => {
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
           const text = event.results[i][0].transcript.trim();
           if (text) {
-            conversationTranscript.push({ role: "พนักงานขาย (Telesales)", text: text });
+            const roleName = "พนักงานขาย (Telesales)";
+            let lastEntry = conversationTranscript[conversationTranscript.length - 1];
+            if (lastEntry && lastEntry.role === roleName) {
+              lastEntry.text += " " + text;
+            } else {
+              conversationTranscript.push({ role: roleName, text: text });
+            }
             log(`[พนักงาน]: ${text}`);
           }
         }
       }
     };
 
-    // Auto Restart ป้องกันไมค์ตัดเองเมื่อเงียบเกิน 10-15 วินาที
     recognition.onend = () => {
+      isRecognizing = false;
       if (isCalling) {
         setTimeout(() => {
-          if (isCalling && recognition) {
-            try { 
-              recognition.start(); 
-            } catch(e) { 
-              log("STT Restart Notice: " + e.message); 
-            }
+          if (isCalling && recognition && !isRecognizing) {
+            try { recognition.start(); } catch(e) {}
           }
         }, 300);
       }
     };
 
-    recognition.onerror = (e) => log("STT Error: " + e.error);
-    recognition.start();
-  }
-
-  function stopSpeechToText() {
-    if (recognition) {
-      recognition.onend = null;
-      recognition.stop();
-      recognition = null;
-    }
+    recognition.onerror = (e) => {
+      log("STT Error: " + e.error);
+      isRecognizing = false;
+    };
+    
+    try { recognition.start(); } catch(e) {}
   }
 
   async function startSession() {
-    log("กำลังเริ่มเชื่อมต่อระบบ...");
-    updateStatus("กำลังขอสิทธิ์ใช้งานไมโครโฟน...", "");
-    startBtn.disabled = true;
-    evalCard.style.display = "none";
-    downloadBtn.style.display = "none";
+    apiKey = prompt("กรุณาใส่ API Key ของคุณ:");
+    if (!apiKey) return;
+
     conversationTranscript = [];
+    currentEvaluationData = null;
+    evalCard.style.display = 'none';
+    downloadBtn.style.display = 'none';
+    logDiv.innerText = '-- เริ่มสายสนทนา --';
+
+    startBtn.style.display = "none";
+    stopBtn.style.display = "inline-block";
+    stopBtn.disabled = true;
+    updateStatus("กำลังเชื่อมต่อระบบ...", "");
     isCalling = true;
-    nextStartTime = 0;
 
     try {
-      micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } });
-      const response = await fetch('/api/live');
-      const data = await response.json();
-
-      if (!data.key) {
-        updateStatus("ไม่พบ GEMINI_API_KEY", "error");
-        startBtn.disabled = false;
-        isCalling = false;
-        return;
-      }
-      apiKey = data.key;
-
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
-      if (audioCtx.state === 'suspended') await audioCtx.resume();
-      nextStartTime = audioCtx.currentTime;
-
-      const activePersonaData = personas[currentPersona];
+      micStream = await navigator.mediaDevices.getUserMedia({ 
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
+      });
       
       const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        log(`เชื่อมต่อ Live API สำเร็จ (${activePersonaData.name})`);
-        updateStatus("ส่งการตั้งค่าไปยัง AI...", "active");
-        startBtn.style.display = "none";
-        stopBtn.style.display = "block";
+        log("WebSocket Connected");
+        updateStatus("เชื่อมต่อสำเร็จ กำลังจำลองลูกค้า...", "active");
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+        nextStartTime = audioCtx.currentTime;
 
-        const setupMessage = {
+        const setupPayload = {
           setup: {
             model: "models/gemini-3.1-flash-live-preview",
             generationConfig: {
               responseModalities: ["AUDIO"],
               speechConfig: {
                 voiceConfig: {
-                  prebuiltVoiceConfig: { voiceName: activePersonaData.voice }
+                  prebuiltVoiceConfig: {
+                    voiceName: personas[currentPersona].voice
+                  }
                 }
               }
             },
             systemInstruction: {
-              parts: [{ text: activePersonaData.instruction }]
+              parts: [{ text: personas[currentPersona].instruction }]
             }
           }
         };
-        ws.send(JSON.stringify(setupMessage));
+        ws.send(JSON.stringify(setupPayload));
+        log("Sent Setup Payload");
+        
+        startMicStream(micStream);
+        startSpeechToText();
+        stopBtn.disabled = false;
       };
 
       ws.onmessage = async (event) => {
+        let resData;
         try {
-          let rawData = event.data;
-          if (rawData instanceof Blob) rawData = await rawData.text();
-          let resData = JSON.parse(rawData);
-
-          if (resData.setupComplete) {
-            updateStatus("กำลังสนทนา (พูดเสนอขายได้เลย)", "active");
-            startMicStream(micStream);
-            startSpeechToText();
-            return;
+          if (event.data instanceof Blob) {
+            const textData = await event.data.text();
+            resData = JSON.parse(textData);
+          } else {
+            resData = JSON.parse(event.data);
           }
 
           if (resData.serverContent && resData.serverContent.modelTurn) {
             const parts = resData.serverContent.modelTurn.parts;
             for (const part of parts) {
               if (part.text) {
-                conversationTranscript.push({ role: `ลูกค้า (${currentPersona})`, text: part.text });
+                const roleName = `ลูกค้า (${currentPersona})`;
                 log(`[ลูกค้า]: ${part.text}`);
+                
+                let lastEntry = conversationTranscript[conversationTranscript.length - 1];
+                if (lastEntry && lastEntry.role === roleName) {
+                  lastEntry.text += part.text;
+                } else {
+                  conversationTranscript.push({ role: roleName, text: part.text });
+                }
               }
               if (part.inlineData && part.inlineData.mimeType && part.inlineData.mimeType.startsWith("audio/pcm")) {
                 await playAudioChunk(part.inlineData.data);
               }
             }
           }
-        } catch (err) {
-          log("Parse Error: " + err.message);
+        } catch (e) {
+          log("Parse error: " + e.message);
         }
       };
 
-      ws.onclose = () => {
-        stopSessionResources();
-        startBtn.style.display = "block";
-        startBtn.disabled = false;
-        stopBtn.style.display = "none";
-        evaluateSession();
+      ws.onerror = (e) => {
+        log("WebSocket Error");
+        updateStatus("ข้อผิดพลาดในการเชื่อมต่อ", "error");
+        stopSession();
       };
 
-    } catch (err) {
-      log("Error: " + err.message);
-      updateStatus("เปิดไมค์หรือสตรีมไม่สำเร็จ", "error");
-      startBtn.disabled = false;
-      stopSessionResources();
+      ws.onclose = () => {
+        log("WebSocket Closed");
+        stopSession();
+      };
+
+    } catch (e) {
+      log("Mic access denied or error: " + e.message);
+      updateStatus("ไม่สามารถเปิดไมค์ได้", "error");
+      stopSession();
     }
   }
 
@@ -534,8 +529,11 @@
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
         const inputData = e.inputBuffer.getChannelData(0);
         const base64Audio = convertFloat32ToInt16Base64(inputData);
+        
         ws.send(JSON.stringify({
-          realtimeInput: { audio: { mimeType: "audio/pcm;rate=16000", data: base64Audio } }
+          realtimeInput: { 
+            mediaChunks: [{ mimeType: "audio/pcm;rate=16000", data: base64Audio }] 
+          }
         }));
       };
 
@@ -546,24 +544,28 @@
     }
   }
 
-  function stopSessionResources() {
+  async function stopSession() {
     isCalling = false;
-    if (speakingTimeout) clearTimeout(speakingTimeout);
+    updateStatus("จบสายการสนทนา", "");
     setAvatarSpeaking(false);
-    stopSpeechToText();
-    if (processor) { processor.disconnect(); processor = null; }
-    if (inputAudioCtx) { inputAudioCtx.close(); inputAudioCtx = null; }
-    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
-    if (audioCtx) { audioCtx.close(); audioCtx = null; }
-    nextStartTime = 0;
+    
+    if (recognition) {
+      recognition.stop();
+      recognition = null;
+    }
+
+    if (processor) processor.disconnect();
+    if (micStream) micStream.getTracks().forEach(track => track.stop());
+    if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+
+    stopBtn.style.display = "none";
+    startBtn.style.display = "inline-block";
+
+    if (conversationTranscript.length > 0) {
+      await evaluateSession();
+    }
   }
 
-  function stopSession() {
-    if (ws) ws.close();
-    stopSessionResources();
-  }
-
-  // ระบบประเมิน QC หลังจบการสนทนา
   async function evaluateSession() {
     if (!apiKey) return;
     updateStatus("กำลังวิเคราะห์ผลการประเมิน QC...", "evaluating");
@@ -573,7 +575,7 @@
     }
 
     const promptText = `
-    คุณคือผู้เชี่ยวชาญด้าน QC สาย Telesales ประกันภัยรถยนต์
+    คุณคือผู้เชี่ยวชาญด้าน QC สาย Telesales ประกันภัย
     โปรดวิเคราะห์บทสนทนาฝั่งพนักงานขายประกันที่คุยกับลูกค้า persona: "${personas[currentPersona].name}" 
     และประเมินผลการเสนอขายอย่างละเอียด
     
@@ -588,15 +590,15 @@
       "fatalMistakes": ["ข้อผิดพลาดร้ายแรง/คำต้องห้าม (ถ้าไม่มีให้ใส่อาร์เรย์ว่าง)"]
     }`;
 
-// แก้ไขในฟังก์ชัน evaluateSession()
-const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key=${apiKey}`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ 
-    contents: [{ parts: [{ text: promptText }] }], 
-    generationConfig: { responseMimeType: "application/json" } 
-  })
-});
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          contents: [{ parts: [{ text: promptText }] }], 
+          generationConfig: { responseMimeType: "application/json" } 
+        })
+      });
 
       if (!res.ok) {
         const errJson = await res.json();
@@ -604,58 +606,84 @@ const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models
       }
 
       const data = await res.json();
-      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      let textOutput = data.candidates[0].content.parts[0].text;
+      const parsedData = JSON.parse(textOutput);
       
-      if (!rawText) throw new Error("ไม่ได้รับข้อมูล JSON จาก Gemini API");
-
-      currentEvaluationData = JSON.parse(rawText);
-      
-      document.getElementById('scoreBadge').innerText = `${currentEvaluationData.score || 0}/100`;
-      document.getElementById('strengthsList').innerHTML = (currentEvaluationData.strengths || []).map(s => `<li>${s}</li>`).join('');
-      document.getElementById('improvementsList').innerHTML = (currentEvaluationData.improvements || []).map(i => `<li>${i}</li>`).join('');
-      
-      const fatalBox = document.getElementById('fatalBox');
-      if (currentEvaluationData.fatalMistakes && currentEvaluationData.fatalMistakes.length > 0 && currentEvaluationData.fatalMistakes[0] !== "") {
-        fatalBox.className = "fatal-box text-red";
-        fatalBox.innerHTML = `⚠️ ${currentEvaluationData.fatalMistakes.join('<br>')}`;
-      } else {
-        fatalBox.className = "fatal-box text-green";
-        fatalBox.innerHTML = "✅ ไม่พบข้อผิดพลาดร้ายแรง";
-      }
-
-      evalCard.style.display = "block";
-      downloadBtn.style.display = "block";
+      currentEvaluationData = parsedData;
+      displayEvaluation(parsedData);
       updateStatus("การประเมิน QC เสร็จสิ้น", "active");
-      log("การประเมินผล QC เสร็จสมบูรณ์");
+
     } catch (e) {
-      log("QC Error: " + e.message);
-      updateStatus("การวิเคราะห์ QC ขัดข้อง (" + e.message + ")", "error");
+      log("QC Evaluation Error: " + e.message);
+      updateStatus("เกิดข้อผิดพลาดในการประเมินผล", "error");
     }
   }
 
-  // ดาวน์โหลดรายงาน QC เป็นไฟล์ Text
-  downloadBtn.addEventListener('click', () => {
-    if (!currentEvaluationData) return;
-    const reportText = `=== รายงานประเมิน QC Telesales ===\n` +
-      `ลูกค้า: ${personas[currentPersona].name}\n` +
-      `วันที่ประเมิน: ${new Date().toLocaleString('th-TH')}\n` +
-      `คะแนนสุทธิ: ${currentEvaluationData.score}/100\n\n` +
-      `[จุดแข็ง]\n- ${currentEvaluationData.strengths.join('\n- ')}\n\n` +
-      `[จุดที่ต้องปรับปรุง]\n- ${currentEvaluationData.improvements.join('\n- ')}\n\n` +
-      `[ข้อผิดพลาดร้ายแรง]\n- ${(currentEvaluationData.fatalMistakes.length > 0 && currentEvaluationData.fatalMistakes[0] !== '') ? currentEvaluationData.fatalMistakes.join('\n- ') : 'ไม่มี'}\n\n` +
-      `=== บันทึกบทสนทนา ===\n` +
-      conversationTranscript.map(t => `${t.role}: ${t.text}`).join('\n');
+  function displayEvaluation(data) {
+    evalCard.style.display = 'block';
+    downloadBtn.style.display = 'inline-block';
+    
+    const scoreBadge = document.getElementById('scoreBadge');
+    scoreBadge.innerText = `${data.score}/100`;
+    scoreBadge.style.color = data.score >= 80 ? '#2563eb' : (data.score >= 60 ? '#d97706' : '#dc2626');
 
-    const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `QC_Report_${Date.now()}.txt`;
-    link.click();
-  });
+    document.getElementById('strengthsList').innerHTML = data.strengths.map(s => `<li>${s}</li>`).join('');
+    document.getElementById('improvementsList').innerHTML = data.improvements.map(i => `<li>${i}</li>`).join('');
+    
+    const fatalBox = document.getElementById('fatalBox');
+    if (data.fatalMistakes && data.fatalMistakes.length > 0) {
+      fatalBox.innerHTML = `<ul class="eval-list" style="color: #991b1b; font-weight:600;">${data.fatalMistakes.map(f => `<li>${f}</li>`).join('')}</ul>`;
+      fatalBox.style.background = '#fef2f2';
+      fatalBox.style.borderColor = '#fca5a5';
+    } else {
+      fatalBox.innerText = "ไม่พบข้อผิดพลาดร้ายแรง (เยี่ยมมาก!)";
+      fatalBox.style.background = '#f0fdf4';
+      fatalBox.style.borderColor = '#bbf7d0';
+      fatalBox.style.color = '#166534';
+    }
+  }
+
+  function downloadReport() {
+    if (!currentEvaluationData) return;
+    
+    let reportContent = `รายงานการประเมินผล QC Telesales\n`;
+    reportContent += `Persona ลูกค้า: ${personas[currentPersona].name}\n`;
+    reportContent += `วันที่: ${new Date().toLocaleString()}\n`;
+    reportContent += `================================\n\n`;
+    
+    reportContent += `คะแนนประเมิน: ${currentEvaluationData.score}/100\n\n`;
+    
+    reportContent += `[จุดแข็ง]\n`;
+    currentEvaluationData.strengths.forEach(s => reportContent += `- ${s}\n`);
+    
+    reportContent += `\n[จุดที่ต้องพัฒนา]\n`;
+    currentEvaluationData.improvements.forEach(i => reportContent += `- ${i}\n`);
+    
+    reportContent += `\n[ข้อผิดพลาดร้ายแรง]\n`;
+    if (currentEvaluationData.fatalMistakes && currentEvaluationData.fatalMistakes.length > 0) {
+      currentEvaluationData.fatalMistakes.forEach(f => reportContent += `- ${f}\n`);
+    } else {
+      reportContent += `- ไม่มี\n`;
+    }
+
+    reportContent += `\n================================\n`;
+    reportContent += `[บันทึกบทสนทนา (Transcript)]\n`;
+    conversationTranscript.forEach(t => {
+      reportContent += `${t.role}: ${t.text}\n`;
+    });
+
+    const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `QC_Report_${new Date().getTime()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   startBtn.addEventListener('click', startSession);
   stopBtn.addEventListener('click', stopSession);
+  downloadBtn.addEventListener('click', downloadReport);
 </script>
-
 </body>
 </html>
