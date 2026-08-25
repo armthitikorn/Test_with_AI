@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Telesales Live Simulator - Multi-Persona & QC (Gemini 3.1 + 2.5 Flash)</title>
+  <title>Telesales Live Simulator - AI Voice Evaluation</title>
   <style>
     * { box-sizing: border-box; }
     body { 
@@ -176,7 +176,7 @@
 
 <div class="card">
   <h2>Telesales Live Simulator</h2>
-  <p>ระบบฝึกซ้อมเสนอขายประกันภัยพร้อมประเมินผล QC อัตโนมัติ</p>
+  <p>ระบบฝึกซ้อมเสนอขายประกันภัย (QC จากไฟล์เสียงจริง)</p>
   
   <div class="persona-selector">
     <button id="btnDragon" class="persona-btn active" onclick="switchPersona('dragon')">👨‍💼 คุณมังกร (ชาย)</button>
@@ -284,11 +284,15 @@
   let inputAudioCtx = null;
   let nextStartTime = 0;
   let apiKey = null;
-  let recognition = null;
+  
+  // ระบบอัดเสียงพนักงาน (MediaRecorder)
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let employeeAudioBase64 = null;
   
   let isCalling = false;
   let speakingTimeout = null;
-  let conversationTranscript = [];
+  let conversationTranscript = []; // ยังเก็บฝั่ง AI ไว้เพื่อเป็นบริบท
   let currentEvaluationData = null;
 
   function log(msg) {
@@ -320,6 +324,16 @@
       binary += String.fromCharCode(bytes[i]);
     }
     return btoa(binary);
+  }
+
+  // Helper Function: แปลง Blob เสียงเป็น Base64
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
   }
 
   async function playAudioChunk(base64Pcm) {
@@ -362,56 +376,6 @@
     }
   }
 
-  function startSpeechToText() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      log("เบราว์เซอร์ไม่รองรับ Speech Recognition");
-      return;
-    }
-    
-    recognition = new SpeechRecognition();
-    recognition.lang = 'th-TH';
-    recognition.continuous = true;
-    recognition.interimResults = false;
-
-    recognition.onresult = (event) => {
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          const text = event.results[i][0].transcript.trim();
-          if (text) {
-            conversationTranscript.push({ role: "พนักงานขาย (Telesales)", text: text });
-            log(`[พนักงาน]: ${text}`);
-          }
-        }
-      }
-    };
-
-    recognition.onend = () => {
-      if (isCalling) {
-        setTimeout(() => {
-          if (isCalling && recognition) {
-            try { 
-              recognition.start(); 
-            } catch(e) { 
-              log("STT Restart Notice: " + e.message); 
-            }
-          }
-        }, 300);
-      }
-    };
-
-    recognition.onerror = (e) => log("STT Error: " + e.error);
-    recognition.start();
-  }
-
-  function stopSpeechToText() {
-    if (recognition) {
-      recognition.onend = null;
-      recognition.stop();
-      recognition = null;
-    }
-  }
-
   async function startSession() {
     log("กำลังเริ่มเชื่อมต่อระบบ...");
     updateStatus("กำลังขอสิทธิ์ใช้งานไมโครโฟน...", "");
@@ -419,6 +383,8 @@
     evalCard.style.display = "none";
     downloadBtn.style.display = "none";
     conversationTranscript = [];
+    audioChunks = [];
+    employeeAudioBase64 = null;
     isCalling = true;
     nextStartTime = 0;
 
@@ -439,9 +405,21 @@
       if (audioCtx.state === 'suspended') await audioCtx.resume();
       nextStartTime = audioCtx.currentTime;
 
-      const activePersonaData = personas[currentPersona];
+      // 🎤 สร้าง MediaRecorder อัดเสียงพนักงานไว้ประเมิน QC
+      mediaRecorder = new MediaRecorder(micStream);
+      mediaRecorder.ondataavailable = event => {
+        if (event.data.size > 0) audioChunks.push(event.data);
+      };
       
-      // ✅ คงไว้ใช้ Gemini 3.1 Live Preview สำหรับสตรีมเสียงความคมชัดสูงและอารมณ์ธรรมชาติ
+      // เมื่อหยุดอัดเสียง ให้รวมไฟล์แล้วเรียก Evaluate
+      mediaRecorder.onstop = async () => {
+        log("สิ้นสุดการอัดเสียง เตรียมวิเคราะห์ไฟล์...");
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        employeeAudioBase64 = await blobToBase64(audioBlob);
+        evaluateSessionWithAudio(); 
+      };
+
+      const activePersonaData = personas[currentPersona];
       const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
       ws = new WebSocket(wsUrl);
 
@@ -479,7 +457,8 @@
           if (resData.setupComplete) {
             updateStatus("กำลังสนทนา (พูดเสนอขายได้เลย)", "active");
             startMicStream(micStream);
-            startSpeechToText();
+            mediaRecorder.start(); // เริ่มอัดเสียงเมื่อตั้งค่าเสร็จ
+            log("เริ่มบันทึกเสียงฝั่งพนักงานแล้ว");
             return;
           }
 
@@ -505,7 +484,6 @@
         startBtn.style.display = "block";
         startBtn.disabled = false;
         stopBtn.style.display = "none";
-        evaluateSession();
       };
 
     } catch (err) {
@@ -542,7 +520,12 @@
     isCalling = false;
     if (speakingTimeout) clearTimeout(speakingTimeout);
     setAvatarSpeaking(false);
-    stopSpeechToText();
+    
+    // สั่งให้หยุดอัดเสียง ซึ่งจะไป Trigger Event: onstop ให้ทำงาน evaluateSession ต่อ
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+
     if (processor) { processor.disconnect(); processor = null; }
     if (inputAudioCtx) { inputAudioCtx.close(); inputAudioCtx = null; }
     if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
@@ -551,52 +534,54 @@
   }
 
   function stopSession() {
-    if (ws) ws.close();
-    stopSessionResources();
+    if (ws) ws.close(); // ปิด Websocket, trigger onclose ซึ่งจะเรียก stopSessionResources
+    else stopSessionResources();
   }
 
-  // ✅ ระบบประเมิน QC ปรับจูน Prompt สเปก Telesales ประกันภัย + ใช้ gemini-2.5-flash
-  async function evaluateSession() {
+  // 🚀 ส่งทั้งไฟล์เสียง + บทสนทนา AI ไปให้ Gemini 3.6 ประเมิน
+  async function evaluateSessionWithAudio() {
     if (!apiKey) return;
-    updateStatus("กำลังวิเคราะห์ผลการประเมิน QC...", "evaluating");
-
-    if (!conversationTranscript || conversationTranscript.length === 0) {
-      conversationTranscript.push({ role: "System", text: "ไม่มีบทสนทนา หรือจบสายก่อนการพูดคุย" });
-    }
+    updateStatus("กำลังวิเคราะห์ไฟล์เสียงเพื่อประเมิน QC...", "evaluating");
 
     const promptText = `
     คุณคือผู้เชี่ยวชาญด้าน QC สาย Telesales ประกันภัยรถยนต์ระดับมืออาชีพ
-    โปรดวิเคราะห์บทสนทนาฝั่ง "พนักงานขาย (Telesales)" ที่พูดคุยกับลูกค้า persona: "${personas[currentPersona].name}"
+    ฉันได้แนบ "ไฟล์เสียงของพนักงานขาย" ที่คุยกับลูกค้า (ลูกค้าชื่อ: ${personas[currentPersona].name})
+    และบริบทบทสนทนาฝั่งลูกค้าด้านล่าง เพื่อให้คุณใช้เป็นข้อมูลประกอบ
 
     เกณฑ์การตรวจประเมิน (เต็ม 100 คะแนน):
-    1. การเปิดสายและการระบุตัวตน (20 คะแนน): ทักทายสุภาพ, แนะนำตัว/บริษัท, และขออนุญาตบันทึกเสียงสนทนา
-    2. การนำเสนอสิทธิประโยชน์และความคุ้มครอง (30 คะแนน): อธิบายทุนประกัน เบี้ยประกัน และความคุ้มครองชัดเจน ไม่ปิดบังเงื่อนไข
-    3. การรับมือข้อโต้แย้ง (Objection Handling) (25 คะแนน): ฟังลูกค้า ไม่แทรกจังหวะ และแก้ข้อสงสัยได้ดี
-    4. มารยาทและปิดการขาย (25 คะแนน): น้ำเสียงสุภาพ ปิดการขายโดยไม่ยัดเยียด
+    1. การเปิดสายและการระบุตัวตน (20 คะแนน): ทักทาย, แนะนำตัว/บริษัท, ขออนุญาตบันทึกเสียง
+    2. การนำเสนอสิทธิประโยชน์ (30 คะแนน): อธิบายเงื่อนไข เบี้ยประกัน ชัดเจน
+    3. การรับมือข้อโต้แย้ง (25 คะแนน): ฟังลูกค้าและแก้ข้อสงสัยได้ดีตามน้ำเสียง
+    4. มารยาทและน้ำเสียง (25 คะแนน): สุภาพ เป็นมิตร ไม่ยัดเยียด
 
     ข้อผิดพลาดร้ายแรง (Fatal Mistakes):
-    - พูดคำต้องห้ามตามกฎหมาย คปภ. เช่น "บังคับทำ", "ไม่ต้องจ่ายเงินสักบาท", "ไม่มีเงื่อนไขใดๆ"
-    - ไม่แจ้งสิทธิการยกเลิกกรมธรรม์ (Free-look period)
-    - ให้ข้อมูลความคุ้มครองที่เป็นเท็จ หรือการันตีสิ่งนอกเหนือเงื่อนไขกรมธรรม์
+    - พูดคำต้องห้าม (เช่น "บังคับทำ", "ฟรีทั้งหมด") หรือให้ข้อมูลเท็จ
 
-    บทสนทนาที่บันทึกได้:
+    บทสนทนาฝั่งลูกค้า:
     ${JSON.stringify(conversationTranscript, null, 2)}
 
-    โปรดตอบกลับในรูปแบบ JSON Structure ตามนี้เท่านั้น (ห้ามใส่ Markdown หรือข้อความอื่นนอกเหนือจาก JSON):
+    โปรดตอบกลับในรูปแบบ JSON ตามนี้เท่านั้น (ห้ามมี Markdown):
     {
       "score": 85,
-      "strengths": ["จุดแข็งหรือข้อดีที่พนักงานทำได้ดี"],
-      "improvements": ["ข้อควรปรับปรุงเพื่อเพิ่มยอดขายหรือบริการ"],
-      "fatalMistakes": ["ข้อผิดพลาดร้ายแรง/คำต้องห้าม (หากไม่มีให้ระบุอาร์เรย์ว่าง [])"]
+      "strengths": ["จุดแข็ง"],
+      "improvements": ["จุดพัฒนา"],
+      "fatalMistakes": ["ข้อห้าม (ถ้าไม่มีให้ใส่อาร์เรย์ว่าง)"]
     }`;
 
     try {
-      // ✅ เรียกผ่าน gemini-2.5-flash สำหรับการประเมิน Text/JSON เสถียร 100%
+      // ✅ ใช้ Gemini 3.6 Flash รองรับการอ่านไฟล์เสียง
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          contents: [{ parts: [{ text: promptText }] }], 
+          contents: [
+            { 
+              parts: [
+                { text: promptText },
+                { inlineData: { mimeType: "audio/webm", data: employeeAudioBase64 } } // แนบไฟล์เสียง!
+              ] 
+            }
+          ], 
           generationConfig: { responseMimeType: "application/json" } 
         })
       });
@@ -609,7 +594,7 @@
       const data = await res.json();
       const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
       
-      if (!rawText) throw new Error("ไม่ได้รับข้อมูล JSON จาก Gemini API");
+      if (!rawText) throw new Error("ไม่ได้รับข้อมูล JSON จาก Gemini");
 
       currentEvaluationData = JSON.parse(rawText);
       
@@ -628,8 +613,8 @@
 
       evalCard.style.display = "block";
       downloadBtn.style.display = "block";
-      updateStatus("การประเมิน QC เสร็จสิ้น", "active");
-      log("การประเมินผล QC เสร็จสมบูรณ์");
+      updateStatus("การประเมิน QC สำเร็จ!", "active");
+      log("ประเมินผลจากไฟล์เสียงเรียบร้อย");
     } catch (e) {
       log("QC Error: " + e.message);
       updateStatus("การวิเคราะห์ QC ขัดข้อง (" + e.message + ")", "error");
@@ -638,20 +623,18 @@
 
   downloadBtn.addEventListener('click', () => {
     if (!currentEvaluationData) return;
-    const reportText = `=== รายงานประเมิน QC Telesales ===\n` +
+    const reportText = `=== รายงานประเมิน QC Telesales (จากไฟล์เสียง) ===\n` +
       `ลูกค้า: ${personas[currentPersona].name}\n` +
-      `วันที่ประเมิน: ${new Date().toLocaleString('th-TH')}\n` +
-      `คะแนนสุทธิ: ${currentEvaluationData.score}/100\n\n` +
+      `วันที่: ${new Date().toLocaleString('th-TH')}\n` +
+      `คะแนน: ${currentEvaluationData.score}/100\n\n` +
       `[จุดแข็ง]\n- ${currentEvaluationData.strengths.join('\n- ')}\n\n` +
       `[จุดที่ต้องปรับปรุง]\n- ${currentEvaluationData.improvements.join('\n- ')}\n\n` +
-      `[ข้อผิดพลาดร้ายแรง]\n- ${(currentEvaluationData.fatalMistakes.length > 0 && currentEvaluationData.fatalMistakes[0] !== '') ? currentEvaluationData.fatalMistakes.join('\n- ') : 'ไม่มี'}\n\n` +
-      `=== บันทึกบทสนทนา ===\n` +
-      conversationTranscript.map(t => `${t.role}: ${t.text}`).join('\n');
+      `[ข้อผิดพลาด]\n- ${(currentEvaluationData.fatalMistakes.length > 0 && currentEvaluationData.fatalMistakes[0] !== '') ? currentEvaluationData.fatalMistakes.join('\n- ') : 'ไม่มี'}\n`;
 
     const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `QC_Report_${Date.now()}.txt`;
+    link.download = `QC_Voice_Report_${Date.now()}.txt`;
     link.click();
   });
 
